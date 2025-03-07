@@ -1,0 +1,1 @@
+streamlitpandasgoogle-cloud-bigquerypython-dateutil
