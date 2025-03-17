@@ -8,11 +8,11 @@ import uuid
 from dateutil.relativedelta import relativedelta
 
 # =============================================================================
-# Custom CSS to style the dark bar and force columns not to wrap
+# Custom CSS to style the dark bar and adjust for mobile
 # =============================================================================
 st.markdown("""
 <style>
-/* Prevent st.columns from wrapping */
+/* Force st.columns to not wrap */
 [data-testid="stHorizontalBlock"] {
   flex-wrap: nowrap !important;
 }
@@ -23,14 +23,15 @@ st.markdown("""
   padding: 10px;
   border-radius: 5px;
   margin-bottom: 8px;
+  width: 100%;
 }
 
-/* Ensure text in the bar is kept in one line */
+/* Text styling inside the dark bar */
 .dark-bar span {
   white-space: nowrap;
 }
 
-/* Styling for metric boxes */
+/* Metric boxes */
 .metric-box {
   background-color: #333;
   padding: 10px 15px;
@@ -45,9 +46,22 @@ st.markdown("""
     padding: 5px;
     font-size: 14px;
   }
+  [data-testid="stHorizontalBlock"] > div {
+    padding: 2px !important;
+    margin: 2px !important;
+  }
+  .row-button {
+    padding: 2px 4px !important;
+    font-size: 10px !important;
+    margin-left: 2px !important;
+  }
   .metric-box {
     font-size: 12px;
     padding: 5px 8px;
+  }
+  /* Reduce calendar font size if needed */
+  .calendar-container table {
+    font-size: 12px;
   }
 }
 </style>
@@ -239,7 +253,7 @@ def add_dimension_row(type_val, category_val, budget_item_val):
     job.result()
 
 # =============================================================================
-# Row Rendering Functions for Budget Planning (Native Buttons with Dark Bar)
+# Row Rendering Functions for Budget Planning (Native Buttons)
 # =============================================================================
 def render_budget_row_html(row, color_class):
     """Render a budget row as a dark bar with native buttons."""
@@ -249,6 +263,7 @@ def render_budget_row_html(row, color_class):
     amount_str = f"${row['amount']:,.2f}"
     with st.container():
         st.markdown("<div class='dark-bar'>", unsafe_allow_html=True)
+        # Adjust columns ratios as needed (smaller widths on mobile might be applied via CSS)
         col_date, col_item, col_amt, col_edit, col_remove = st.columns([1, 3, 1, 1, 1])
         col_date.markdown(f"<span style='color:#fff; font-weight:bold;'>{date_str}</span>", unsafe_allow_html=True)
         col_item.markdown(f"<span style='color:#fff;'>{item_str}</span>", unsafe_allow_html=True)
@@ -262,7 +277,7 @@ def render_budget_row_html(row, color_class):
         st.markdown("</div>", unsafe_allow_html=True)
 
 def render_budget_row_edit(row, color_class):
-    """Render the editing interface for a budget row using native inputs."""
+    """Render an editing interface for a budget row using native inputs."""
     row_id = row["rowid"]
     item_str = row["budget_item"]
     amount_str = f"${row['amount']:,.2f}"
@@ -281,7 +296,7 @@ def render_budget_row_edit(row, color_class):
         st.experimental_rerun()
 
 # =============================================================================
-# Row Rendering Functions for Debt Domination (Native Buttons with Dark Bar)
+# Row Rendering Functions for Debt Domination (Native Buttons)
 # =============================================================================
 def render_debt_row(row):
     """Render a debt row as a dark bar with native buttons."""
@@ -309,7 +324,7 @@ def render_debt_row(row):
         st.markdown("</div>", unsafe_allow_html=True)
 
 def render_debt_row_edit(row):
-    """Render the editing interface for a debt row using native inputs."""
+    """Render an editing interface for a debt row using native inputs."""
     row_id = row["rowid"]
     row_name = row["debt_name"]
     row_balance = row["current_balance"]
@@ -500,7 +515,7 @@ elif page_choice == "Debt Domination":
     new_min_payment = st.text_input("Minimum Payment (Optional)")
     if st.button("Add Debt"):
         if new_debt_name.strip():
-            # Here, you would call your add_debt_item function.
+            # Here you would call your add_debt_item function.
             st.success("New debt item added (functionality assumed).")
             st.experimental_rerun()
     if st.session_state.active_payoff_plan is not None:
