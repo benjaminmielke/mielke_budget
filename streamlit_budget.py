@@ -12,7 +12,7 @@ from dateutil.relativedelta import relativedelta
 # =============================================================================
 st.markdown("""
 <style>
-/* Force st.columns to not wrap */
+/* Prevent st.columns from wrapping */
 [data-testid="stHorizontalBlock"] {
   flex-wrap: nowrap !important;
 }
@@ -26,12 +26,12 @@ st.markdown("""
   width: 100%;
 }
 
-/* Text styling inside the dark bar */
+/* Ensure text in the bar is kept in one line */
 .dark-bar span {
   white-space: nowrap;
 }
 
-/* Metric boxes */
+/* Styling for metric boxes */
 .metric-box {
   background-color: #333;
   padding: 10px 15px;
@@ -45,6 +45,9 @@ st.markdown("""
   .dark-bar {
     padding: 5px;
     font-size: 14px;
+    max-width: 400px;   /* Limit the dark bar's width */
+    margin-left: auto;
+    margin-right: auto;
   }
   [data-testid="stHorizontalBlock"] > div {
     padding: 2px !important;
@@ -59,7 +62,6 @@ st.markdown("""
     font-size: 12px;
     padding: 5px 8px;
   }
-  /* Reduce calendar font size if needed */
   .calendar-container table {
     font-size: 12px;
   }
@@ -253,7 +255,7 @@ def add_dimension_row(type_val, category_val, budget_item_val):
     job.result()
 
 # =============================================================================
-# Row Rendering Functions for Budget Planning (Native Buttons)
+# Row Rendering Functions for Budget Planning using Native Buttons
 # =============================================================================
 def render_budget_row_html(row, color_class):
     """Render a budget row as a dark bar with native buttons."""
@@ -263,8 +265,8 @@ def render_budget_row_html(row, color_class):
     amount_str = f"${row['amount']:,.2f}"
     with st.container():
         st.markdown("<div class='dark-bar'>", unsafe_allow_html=True)
-        # Adjust columns ratios as needed (smaller widths on mobile might be applied via CSS)
-        col_date, col_item, col_amt, col_edit, col_remove = st.columns([1, 3, 1, 1, 1])
+        # Use smaller column ratios to reduce width on mobile
+        col_date, col_item, col_amt, col_edit, col_remove = st.columns([1, 2, 1, 0.8, 0.8])
         col_date.markdown(f"<span style='color:#fff; font-weight:bold;'>{date_str}</span>", unsafe_allow_html=True)
         col_item.markdown(f"<span style='color:#fff;'>{item_str}</span>", unsafe_allow_html=True)
         col_amt.markdown(f"<span style='color:{color_class};'>{amount_str}</span>", unsafe_allow_html=True)
@@ -277,7 +279,7 @@ def render_budget_row_html(row, color_class):
         st.markdown("</div>", unsafe_allow_html=True)
 
 def render_budget_row_edit(row, color_class):
-    """Render an editing interface for a budget row using native inputs."""
+    """Render the editing interface for a budget row using native inputs."""
     row_id = row["rowid"]
     item_str = row["budget_item"]
     amount_str = f"${row['amount']:,.2f}"
@@ -296,7 +298,7 @@ def render_budget_row_edit(row, color_class):
         st.experimental_rerun()
 
 # =============================================================================
-# Row Rendering Functions for Debt Domination (Native Buttons)
+# Row Rendering Functions for Debt Domination using Native Buttons
 # =============================================================================
 def render_debt_row(row):
     """Render a debt row as a dark bar with native buttons."""
@@ -308,7 +310,7 @@ def render_debt_row(row):
     payoff_text = "Recalc" if row.get("payoff_plan_date") else "Payoff"
     with st.container():
         st.markdown("<div class='dark-bar'>", unsafe_allow_html=True)
-        col_name, col_info, col_amt, col_edit, col_payoff, col_remove = st.columns([1, 3, 1, 1, 1, 1])
+        col_name, col_info, col_amt, col_edit, col_payoff, col_remove = st.columns([1, 2, 1, 0.8, 0.8, 0.8])
         col_name.markdown(f"<span style='color:#fff; font-weight:bold;'>{row_name}</span>", unsafe_allow_html=True)
         col_info.markdown(f"<span style='color:#fff;'>Due: {row_due}, Min: {row_min}</span>", unsafe_allow_html=True)
         col_amt.markdown(f"<span style='color:red;'>${row_balance:,.2f}</span>", unsafe_allow_html=True)
@@ -324,7 +326,7 @@ def render_debt_row(row):
         st.markdown("</div>", unsafe_allow_html=True)
 
 def render_debt_row_edit(row):
-    """Render an editing interface for a debt row using native inputs."""
+    """Render the editing interface for a debt row using native inputs."""
     row_id = row["rowid"]
     row_name = row["debt_name"]
     row_balance = row["current_balance"]
@@ -515,7 +517,7 @@ elif page_choice == "Debt Domination":
     new_min_payment = st.text_input("Minimum Payment (Optional)")
     if st.button("Add Debt"):
         if new_debt_name.strip():
-            # Here you would call your add_debt_item function.
+            # Call your add_debt_item function here.
             st.success("New debt item added (functionality assumed).")
             st.experimental_rerun()
     if st.session_state.active_payoff_plan is not None:
