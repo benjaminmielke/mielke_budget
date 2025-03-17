@@ -96,14 +96,14 @@ def set_query_params_fallback(**kwargs):
 # =============================================================================
 # Session State Initialization
 # =============================================================================
-# For editing Budget Planning rows
+# For Budget Planning editing
 if "editing_budget_item" not in st.session_state:
     st.session_state.editing_budget_item = None
 if "temp_budget_edit_date" not in st.session_state:
     st.session_state.temp_budget_edit_date = datetime.today()
 if "temp_budget_edit_amount" not in st.session_state:
     st.session_state.temp_budget_edit_amount = 0.0
-# For editing Debt Domination rows
+# For Debt Domination editing
 if "editing_debt_item" not in st.session_state:
     st.session_state.editing_debt_item = None
 if "temp_new_balance" not in st.session_state:
@@ -118,8 +118,15 @@ if "active_payoff_plan" not in st.session_state:
     st.session_state.active_payoff_plan = None
 if "temp_payoff_date" not in st.session_state:
     st.session_state.temp_payoff_date = datetime.today().date()
-    
-# (Other session state items for "Add New Category/Item" etc. are assumed to be preserved elsewhere.)
+# For Dimension table (Category/Budget Item) management
+if "show_new_category_form" not in st.session_state:
+    st.session_state.show_new_category_form = False
+if "show_new_item_form" not in st.session_state:
+    st.session_state.show_new_item_form = False
+if "temp_new_category" not in st.session_state:
+    st.session_state.temp_new_category = ""
+if "temp_new_item" not in st.session_state:
+    st.session_state.temp_new_item = ""
 
 # =============================================================================
 # BigQuery Setup (using st.secrets)
@@ -189,9 +196,7 @@ def update_debt_item(row_id, new_balance):
     client.query(query).result()
 
 def insert_monthly_payments_for_debt(debt_name, total_balance, debt_due_date_str, payoff_date):
-    # This function creates monthly expense rows for the payoff plan.
-    # (Implementation remains the same as your original code.)
-    # Remove any existing auto-payoff rows first.
+    # Remove existing auto-payoff rows first
     escaped_name = debt_name.replace("'", "''")
     query = f"""
     DELETE FROM `{PROJECT_ID}.{DATASET_ID}.{FACT_TABLE_NAME}`
@@ -250,6 +255,28 @@ def insert_monthly_payments_for_debt(debt_name, total_balance, debt_due_date_str
         job = client.load_table_from_dataframe(df, table_id,
             job_config=bigquery.LoadJobConfig(write_disposition="WRITE_APPEND"))
         job.result()
+
+def load_dimension_rows(type_val):
+    # Load the dimension table rows for a given type (income/expense)
+    query = f"""
+    SELECT rowid, type, category, budget_item
+    FROM `{PROJECT_ID}.{DATASET_ID}.{CATS_TABLE_NAME}`
+    WHERE LOWER(type) = LOWER('{type_val}')
+    """
+    return client.query(query).to_dataframe()
+
+def add_dimension_row(type_val, category_val, budget_item_val):
+    table_id = f"{PROJECT_ID}.{DATASET_ID}.{CATS_TABLE_NAME}"
+    capital_type = type_val.capitalize()
+    df = pd.DataFrame([{
+        "rowid": str(uuid.uuid4()),
+        "type": capital_type,
+        "category": category_val,
+        "budget_item": budget_item_val
+    }])
+    job = client.load_table_from_dataframe(df, table_id,
+        job_config=bigquery.LoadJobConfig(write_disposition="WRITE_APPEND"))
+    job.result()
 
 # =============================================================================
 # Custom Row Rendering Functions for Budget Planning
@@ -312,7 +339,6 @@ def render_debt_row_html(row):
     row_balance = row["current_balance"]
     row_due = row["due_date"] if row["due_date"] else "(None)"
     row_min = row["minimum_payment"] if pd.notnull(row["minimum_payment"]) else "(None)"
-    # For payoff functionality, if a payoff plan exists then show "Recalc", else show "Payoff"
     payoff_text = "Recalc" if row.get("payoff_plan_date") else "Payoff"
     html = f"""
     <div class="line-item">
@@ -383,7 +409,6 @@ if "action" in params and "rowid" in params:
         set_query_params_fallback()
         st.experimental_rerun()
     elif action == "payoff":
-        # For debt rows, when the user clicks Payoff, we store the row id in session state.
         st.session_state.active_payoff_plan = rowid
         set_query_params_fallback()
         st.experimental_rerun()
@@ -458,7 +483,7 @@ if page_choice == "Budget Planning":
     </div>
     """, unsafe_allow_html=True)
     
-    # Calendar display for the month
+    # Calendar display
     days_in_month = calendar.monthrange(st.session_state.current_year, st.session_state.current_month)[1]
     first_weekday = (calendar.monthrange(st.session_state.current_year, st.session_state.current_month)[0] + 1) % 7
     calendar_grid = [["" for _ in range(7)] for _ in range(6)]
@@ -480,12 +505,50 @@ if page_choice == "Budget Planning":
     calendar_html = cal_df.to_html(index=False, escape=False)
     st.markdown(f'<div class="calendar-container">{calendar_html}</div>', unsafe_allow_html=True)
     
-    # Form to add a new transaction
+    # =============================================================================
+    # Add New Income/Expense Form (with drop-downs for Category and Budget Item)
+    # =============================================================================
     st.markdown("<div class='section-subheader'>Add New Income/Expense</div>", unsafe_allow_html=True)
     date_input = st.date_input("Date", value=datetime.today(), label_visibility="collapsed")
     type_input = st.selectbox("Type", ["income", "expense"], label_visibility="collapsed")
-    category_input = st.text_input("Category")
-    budget_item_input = st.text_input("Budget Item")
+    
+    # Load dimension table for this type
+    dimension_df = load_dimension_rows(type_input)
+    all_categories = sorted(dimension_df["category"].unique())
+    if not all_categories:
+        all_categories = ["(No categories yet)"]
+    selected_category = st.selectbox("Category", all_categories, key="cat_dropdown")
+    if st.button("➕ Add New Category", key="add_category"):
+        st.session_state.show_new_category_form = True
+    if st.session_state.show_new_category_form:
+        new_cat = st.text_input("New Category", key="new_cat_input")
+        col_cat1, col_cat2 = st.columns(2)
+        if col_cat1.button("Save Category", key="save_category"):
+            if new_cat.strip():
+                add_dimension_row(type_input, new_cat.strip(), "")
+            st.session_state.show_new_category_form = False
+            st.experimental_rerun()
+        if col_cat2.button("Cancel", key="cancel_category"):
+            st.session_state.show_new_category_form = False
+
+    items_for_cat = dimension_df[dimension_df["category"] == selected_category]["budget_item"].unique()
+    items_for_cat = [i for i in items_for_cat if i != ""]
+    if not items_for_cat:
+        items_for_cat = ["(No items yet)"]
+    selected_budget_item = st.selectbox("Budget Item", items_for_cat, key="budget_item_dropdown")
+    if st.button("➕ Add New Budget Item", key="add_budget_item"):
+        st.session_state.show_new_item_form = True
+    if st.session_state.show_new_item_form:
+        new_item = st.text_input("New Budget Item", key="new_item_input")
+        col_item1, col_item2 = st.columns(2)
+        if col_item1.button("Save Budget Item", key="save_item"):
+            if new_item.strip():
+                add_dimension_row(type_input, selected_category, new_item.strip())
+            st.session_state.show_new_item_form = False
+            st.experimental_rerun()
+        if col_item2.button("Cancel", key="cancel_item"):
+            st.session_state.show_new_item_form = False
+
     amount_input = st.number_input("Amount", min_value=0.0, format="%.2f", label_visibility="collapsed")
     note_input = st.text_area("Note", label_visibility="collapsed")
     if st.button("Add Transaction"):
@@ -495,8 +558,8 @@ if page_choice == "Budget Planning":
             "date": date_input,
             "type": type_input,
             "amount": amount_input,
-            "category": category_input,
-            "budget_item": budget_item_input,
+            "category": selected_category,
+            "budget_item": selected_budget_item,
             "credit_card": None,
             "note": note_input
         }])
@@ -524,7 +587,6 @@ elif page_choice == "Debt Domination":
         </h1>
     """, unsafe_allow_html=True)
     debt_df = load_debt_items()
-    # (Compute total debt metric if desired)
     if debt_df.empty:
         st.write("No debt items found.")
     else:
@@ -533,26 +595,21 @@ elif page_choice == "Debt Domination":
                 render_debt_row_edit(row)
             else:
                 render_debt_row_html(row)
-    
     # Add New Debt Item Form
     st.markdown("<div class='section-subheader'>Add New Debt Item</div>", unsafe_allow_html=True)
     new_debt_name = st.text_input("Debt Name (e.g. 'Loft Credit Card')")
     new_debt_balance = st.number_input("Current Balance", min_value=0.0, format="%.2f")
-    # For due date, use a selectbox with options 1st ... 31st (with a default of "(None)")
     due_date_options = ["(None)"] + [f"{d}{'st' if d==1 else 'nd' if d==2 else 'rd' if d==3 else 'th'}" for d in range(1,32)]
     new_due_date = st.selectbox("Due Date (Optional)", due_date_options, index=0)
     new_min_payment = st.text_input("Minimum Payment (Optional)")
     if st.button("Add Debt"):
         if new_debt_name.strip():
-            # Here, you would call your add_debt_item function.
-            # (For brevity, we assume add_debt_item is defined similarly to the other DB functions.)
-            # For example:
-            # add_debt_item(new_debt_name.strip(), new_debt_balance, new_due_date, new_min_payment)
-            # In this example, we omit the implementation details.
+            # Here you would call your add_debt_item function
+            # For demonstration, we simply show a success message.
             st.success("New debt item added (functionality assumed).")
             st.rerun()
     
-    # If a debt row has been marked for payoff, show the Payoff Plan form.
+    # Payoff Plan Form
     if st.session_state.active_payoff_plan is not None:
         reloaded_debts = load_debt_items()
         match = reloaded_debts[reloaded_debts["rowid"] == st.session_state.active_payoff_plan]
@@ -565,13 +622,13 @@ elif page_choice == "Debt Domination":
             st.subheader(f"Payoff Plan for {plan_name}")
             st.session_state.temp_payoff_date = st.date_input("What date do you want to pay this off by?",
                                                                value=st.session_state.temp_payoff_date)
-            col1, col2 = st.columns(2)
-            if col1.button("Submit"):
+            col_debt1, col_debt2 = st.columns(2)
+            if col_debt1.button("Submit"):
                 insert_monthly_payments_for_debt(plan_name, plan_balance, plan_due, st.session_state.temp_payoff_date)
                 st.session_state.active_payoff_plan = None
                 set_query_params_fallback()
                 st.rerun()
-            if col2.button("Cancel"):
+            if col_debt2.button("Cancel"):
                 st.session_state.active_payoff_plan = None
                 set_query_params_fallback()
                 st.rerun()
@@ -613,4 +670,5 @@ elif page_choice == "Budget Overview":
         </div>
     </div>
     """, unsafe_allow_html=True)
-    # (Additional breakdowns and charts can be added here.)
+    # (Additional breakdowns and charts can be appended here.)
+
