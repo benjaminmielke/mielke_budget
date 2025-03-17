@@ -42,7 +42,7 @@ st.markdown("""
 }
 
 /* Mobile adjustments */
-@media only screen and (max-width: 600px) {
+@media only screen and (max-width: 360px) {
   .dark-bar {
     max-width: 360px;  /* Limit row width on mobile */
     margin-left: auto;
