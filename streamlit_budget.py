@@ -12,12 +12,7 @@ from dateutil.relativedelta import relativedelta
 # =============================================================================
 st.markdown("""
 <style>
-/* Force st.columns horizontal blocks to not wrap */
-[data-testid="stHorizontalBlock"] {
-    flex-wrap: nowrap !important;
-}
-
-/* The row "bar" for each line item */
+/* Ensure our custom HTML rows display inline */
 .line-item {
   display: inline-flex;
   align-items: center;
@@ -36,7 +31,7 @@ st.markdown("""
   margin-right: 10px;
 }
 
-/* Style for the inline buttons (implemented as HTML links) */
+/* HTML links styled as buttons */
 .row-button {
   text-decoration: none;
   background-color: #555;
@@ -99,20 +94,33 @@ def set_query_params_fallback(**kwargs):
         st.experimental_set_query_params(**kwargs)
 
 # =============================================================================
-# Session State Initialization (for editing)
+# Session State Initialization
 # =============================================================================
+if "show_new_category_form" not in st.session_state:
+    st.session_state.show_new_category_form = False
+if "show_new_item_form" not in st.session_state:
+    st.session_state.show_new_item_form = False
+if "temp_new_category" not in st.session_state:
+    st.session_state.temp_new_category = ""
+if "temp_new_item" not in st.session_state:
+    st.session_state.temp_new_item = ""
+
 if "editing_budget_item" not in st.session_state:
     st.session_state.editing_budget_item = None
 if "temp_budget_edit_date" not in st.session_state:
     st.session_state.temp_budget_edit_date = datetime.today()
 if "temp_budget_edit_amount" not in st.session_state:
     st.session_state.temp_budget_edit_amount = 0.0
+
 if "editing_debt_item" not in st.session_state:
     st.session_state.editing_debt_item = None
 if "temp_new_balance" not in st.session_state:
     st.session_state.temp_new_balance = 0.0
 
-# (Other session state items such as new category/item etc. are assumed to be defined elsewhere.)
+if "active_payoff_plan" not in st.session_state:
+    st.session_state.active_payoff_plan = None
+if "temp_payoff_date" not in st.session_state:
+    st.session_state.temp_payoff_date = datetime.today().date()
 
 # =============================================================================
 # BigQuery Setup (using st.secrets)
@@ -129,13 +137,19 @@ DEBT_TABLE_NAME = "fact_debt_items"
 client = bigquery.Client(credentials=credentials, project=PROJECT_ID)
 
 # =============================================================================
-# Database Functions (only a few used in this example)
+# Database Functions
 # =============================================================================
 def load_fact_data():
     query = f"SELECT * FROM `{PROJECT_ID}.{DATASET_ID}.{FACT_TABLE_NAME}`"
     df = client.query(query).to_dataframe()
     df['date'] = pd.to_datetime(df['date'])
     return df
+
+def save_fact_data(rows_df):
+    table_id = f"{PROJECT_ID}.{DATASET_ID}.{FACT_TABLE_NAME}"
+    job = client.load_table_from_dataframe(rows_df, table_id,
+        job_config=bigquery.LoadJobConfig(write_disposition="WRITE_APPEND"))
+    job.result()
 
 def remove_fact_row(row_id):
     query = f"""
@@ -176,10 +190,10 @@ def update_debt_item(row_id, new_balance):
     client.query(query).result()
 
 # =============================================================================
-# Custom Row Rendering Functions for Budget Planning
+# Custom Row Rendering for Budget Planning
 # =============================================================================
 def render_budget_row_html(row, color_class):
-    """Render a budget row as a custom HTML block with inline buttons."""
+    """Render a budget row as custom HTML with inline buttons (non-edit mode)."""
     row_id = row["rowid"]
     date_str = row["date"].strftime("%Y-%m-%d")
     item_str = row["budget_item"]
@@ -200,7 +214,7 @@ def render_budget_row_html(row, color_class):
     st.markdown(html, unsafe_allow_html=True)
 
 def render_budget_row_edit(row, color_class):
-    """Render the editing interface for a budget row using native Streamlit inputs."""
+    """Render the editing interface for a budget row."""
     row_id = row["rowid"]
     item_str = row["budget_item"]
     amount_str = f"${row['amount']:,.2f}"
@@ -227,10 +241,10 @@ def render_budget_row_edit(row, color_class):
         st.rerun()
 
 # =============================================================================
-# Custom Row Rendering Functions for Debt Domination
+# Custom Row Rendering for Debt Domination
 # =============================================================================
 def render_debt_row_html(row):
-    """Render a debt row as a custom HTML block with inline buttons."""
+    """Render a debt row as custom HTML with inline buttons (non-edit mode)."""
     row_id = row["rowid"]
     row_name = row["debt_name"]
     row_balance = row["current_balance"]
@@ -252,7 +266,7 @@ def render_debt_row_html(row):
     st.markdown(html, unsafe_allow_html=True)
 
 def render_debt_row_edit(row):
-    """Render the editing interface for a debt row using native Streamlit inputs."""
+    """Render the editing interface for a debt row."""
     row_id = row["rowid"]
     row_name = row["debt_name"]
     row_balance = row["current_balance"]
@@ -319,21 +333,89 @@ if page_choice == "Budget Planning":
         </h1>
     """, unsafe_allow_html=True)
     
-    # (For brevity, assume current month/year initialization and metrics calculation code is here.)
-    # Load fact data and filter by current month/year.
+    # For simplicity, we use the current month and year (this can be replaced by your month navigation code)
+    current_month = datetime.today().month
+    current_year = datetime.today().year
     fact_data = load_fact_data()
     fact_data.sort_values("date", ascending=True, inplace=True)
-    # (Here you would filter data by current month/year and compute metrics.)
-    filtered_data = fact_data  # For demonstration, we use all data.
+    # Filter data for current month/year
+    filtered_data = fact_data[(fact_data["date"].dt.month == current_month) & (fact_data["date"].dt.year == current_year)]
+    total_income = filtered_data[filtered_data["type"]=="income"]["amount"].sum()
+    total_expenses = filtered_data[filtered_data["type"]=="expense"]["amount"].sum()
+    leftover = total_income - total_expenses
     
-    # List each transaction row.
-    for _, row in filtered_data.iterrows():
-        if st.session_state.editing_budget_item == row["rowid"]:
-            render_budget_row_edit(row, "#00cc00" if row["type"]=="income" else "#ff4444")
-        else:
-            render_budget_row_html(row, "#00cc00" if row["type"]=="income" else "#ff4444")
+    st.markdown(f"""
+    <div style='display: flex; justify-content: space-around; text-align: center; padding: 10px 0;'>
+        <div style='background-color: #333; padding: 10px 15px; border-radius: 10px;'>
+            <div style='font-size: 14px; color: #bbb;'>Total Income</div>
+            <div style='font-size: 20px; font-weight: bold; color: green;'>${total_income:,.2f}</div>
+        </div>
+        <div style='background-color: #333; padding: 10px 15px; border-radius: 10px;'>
+            <div style='font-size: 14px; color: #bbb;'>Total Expenses</div>
+            <div style='font-size: 20px; font-weight: bold; color: red;'>${total_expenses:,.2f}</div>
+        </div>
+        <div style='background-color: #333; padding: 10px 15px; border-radius: 10px;'>
+            <div style='font-size: 14px; color: #bbb;'>Leftover</div>
+            <div style='font-size: 20px; font-weight: bold; color: {"green" if leftover>=0 else "red"};'>${leftover:,.2f}</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
     
-    # (Additional UI such as forms for adding transactions and calendar display can be appended here.)
+    # Calendar display
+    days_in_month = calendar.monthrange(current_year, current_month)[1]
+    first_weekday = (calendar.monthrange(current_year, current_month)[0] + 1) % 7
+    calendar_grid = [["" for _ in range(7)] for _ in range(6)]
+    day_counter = 1
+    for week in range(6):
+        for weekday in range(7):
+            if week == 0 and weekday < first_weekday:
+                continue
+            if day_counter > days_in_month:
+                break
+            cell_html = f"<strong>{day_counter}</strong>"
+            day_tx = filtered_data[filtered_data["date"].dt.day == day_counter]
+            for _, row in day_tx.iterrows():
+                color = "red" if row["type"]=="expense" else "green"
+                cell_html += f"<br><span style='color:{color};'>${row['amount']:,.2f} ({row['budget_item']})</span>"
+            calendar_grid[week][weekday] = cell_html
+            day_counter += 1
+    cal_df = pd.DataFrame(calendar_grid, columns=["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"])
+    calendar_html = cal_df.to_html(index=False, escape=False)
+    st.markdown(f'<div class="calendar-container">{calendar_html}</div>', unsafe_allow_html=True)
+    
+    # Form to add new transaction
+    st.markdown("<div class='section-subheader'>Add New Income/Expense</div>", unsafe_allow_html=True)
+    date_input = st.date_input("Date", value=datetime.today(), label_visibility="collapsed")
+    type_input = st.selectbox("Type", ["income", "expense"], label_visibility="collapsed")
+    # For this example, we use text inputs for category and budget item.
+    category_input = st.text_input("Category")
+    budget_item_input = st.text_input("Budget Item")
+    amount_input = st.number_input("Amount", min_value=0.0, format="%.2f", label_visibility="collapsed")
+    note_input = st.text_area("Note", label_visibility="collapsed")
+    if st.button("Add Transaction"):
+        row_id = str(uuid.uuid4())
+        new_tx = pd.DataFrame([{
+            "rowid": row_id,
+            "date": date_input,
+            "type": type_input,
+            "amount": amount_input,
+            "category": category_input,
+            "budget_item": budget_item_input,
+            "credit_card": None,
+            "note": note_input
+        }])
+        save_fact_data(new_tx)
+        st.rerun()
+    
+    st.markdown("<div class='section-subheader'>Transactions This Month</div>", unsafe_allow_html=True)
+    if filtered_data.empty:
+        st.write("No transactions found for this month.")
+    else:
+        for _, row in filtered_data.iterrows():
+            if st.session_state.editing_budget_item == row["rowid"]:
+                render_budget_row_edit(row, "#00cc00" if row["type"]=="income" else "#ff4444")
+            else:
+                render_budget_row_html(row, "#00cc00" if row["type"]=="income" else "#ff4444")
 
 # =============================================================================
 # Page 2: Debt Domination
@@ -346,12 +428,15 @@ elif page_choice == "Debt Domination":
         </h1>
     """, unsafe_allow_html=True)
     debt_df = load_debt_items()
-    # (Assume metrics such as total debt are computed here.)
-    for _, row in debt_df.iterrows():
-        if st.session_state.editing_debt_item == row["rowid"]:
-            render_debt_row_edit(row)
-        else:
-            render_debt_row_html(row)
+    if debt_df.empty:
+        st.write("No debt items found.")
+    else:
+        for _, row in debt_df.iterrows():
+            if st.session_state.editing_debt_item == row["rowid"]:
+                render_debt_row_edit(row)
+            else:
+                render_debt_row_html(row)
+    # (Additional forms for adding new debt items can be inserted here.)
 
 # =============================================================================
 # Page 3: Budget Overview
@@ -363,7 +448,6 @@ elif page_choice == "Budget Overview":
             Budget Overview
         </h1>
     """, unsafe_allow_html=True)
-    # (Budget Overview code remains largely unchanged—this example uses existing layout.)
     today = datetime.today()
     first_of_this_month = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     start_date = first_of_this_month
@@ -391,5 +475,5 @@ elif page_choice == "Budget Overview":
         </div>
     </div>
     """, unsafe_allow_html=True)
-    # (Additional breakdowns and charts can be appended here.)
+    # (Additional breakdowns such as monthly summaries can be added here.)
 
