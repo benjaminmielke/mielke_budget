@@ -8,16 +8,16 @@ import uuid
 from dateutil.relativedelta import relativedelta
 
 # =============================================================================
-# Custom CSS to force columns not to wrap and style our dark bar rows
+# Custom CSS to style the dark bar and force columns not to wrap
 # =============================================================================
 st.markdown("""
 <style>
-/* Force st.columns to remain in one line */
+/* Prevent st.columns from wrapping */
 [data-testid="stHorizontalBlock"] {
   flex-wrap: nowrap !important;
 }
 
-/* Dark bar for each row */
+/* Dark bar styling for each row */
 .dark-bar {
   background-color: #333;
   padding: 10px;
@@ -25,7 +25,7 @@ st.markdown("""
   margin-bottom: 8px;
 }
 
-/* Ensure text within the bar doesn't wrap unnecessarily */
+/* Ensure text in the bar is kept in one line */
 .dark-bar span {
   white-space: nowrap;
 }
@@ -52,18 +52,6 @@ st.markdown("""
 }
 </style>
 """, unsafe_allow_html=True)
-
-# =============================================================================
-# Helper Functions for Query Parameters (not used in native button approach)
-# =============================================================================
-def get_query_params_fallback():
-    if hasattr(st, "query_params"):
-        return st.query_params
-    else:
-        return st.experimental_get_query_params()
-
-def clear_query_params():
-    st.set_query_params()
 
 # =============================================================================
 # Session State Initialization
@@ -251,10 +239,10 @@ def add_dimension_row(type_val, category_val, budget_item_val):
     job.result()
 
 # =============================================================================
-# Row Rendering Functions for Budget Planning using Native Buttons
+# Row Rendering Functions for Budget Planning (Native Buttons with Dark Bar)
 # =============================================================================
-def render_budget_row(row, color_class):
-    """Render a single budget transaction row as a dark bar using st.columns and native buttons."""
+def render_budget_row_html(row, color_class):
+    """Render a budget row as a dark bar with native buttons."""
     row_id = row["rowid"]
     date_str = row["date"].strftime("%Y-%m-%d")
     item_str = row["budget_item"]
@@ -274,7 +262,7 @@ def render_budget_row(row, color_class):
         st.markdown("</div>", unsafe_allow_html=True)
 
 def render_budget_row_edit(row, color_class):
-    """Render an editing interface for a budget transaction row using native inputs."""
+    """Render the editing interface for a budget row using native inputs."""
     row_id = row["rowid"]
     item_str = row["budget_item"]
     amount_str = f"${row['amount']:,.2f}"
@@ -293,10 +281,10 @@ def render_budget_row_edit(row, color_class):
         st.experimental_rerun()
 
 # =============================================================================
-# Row Rendering Functions for Debt Domination using Native Buttons
+# Row Rendering Functions for Debt Domination (Native Buttons with Dark Bar)
 # =============================================================================
 def render_debt_row(row):
-    """Render a single debt row as a dark bar using native buttons."""
+    """Render a debt row as a dark bar with native buttons."""
     row_id = row["rowid"]
     row_name = row["debt_name"]
     row_balance = row["current_balance"]
@@ -321,7 +309,7 @@ def render_debt_row(row):
         st.markdown("</div>", unsafe_allow_html=True)
 
 def render_debt_row_edit(row):
-    """Render an editing interface for a debt row using native inputs."""
+    """Render the editing interface for a debt row using native inputs."""
     row_id = row["rowid"]
     row_name = row["debt_name"]
     row_balance = row["current_balance"]
@@ -402,7 +390,6 @@ if page_choice == "Budget Planning":
     </div>
     """, unsafe_allow_html=True)
     
-    # Calendar display
     days_in_month = calendar.monthrange(st.session_state.current_year, st.session_state.current_month)[1]
     first_weekday = (calendar.monthrange(st.session_state.current_year, st.session_state.current_month)[0] + 1) % 7
     cal_grid = [["" for _ in range(7)] for _ in range(6)]
@@ -423,7 +410,6 @@ if page_choice == "Budget Planning":
     cal_df = pd.DataFrame(cal_grid, columns=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"])
     st.markdown(f'<div class="calendar-container">{cal_df.to_html(index=False, escape=False)}</div>', unsafe_allow_html=True)
     
-    # Add New Income/Expense Form with drop-downs for Category and Budget Item
     st.markdown("<div class='section-subheader'>Add New Income/Expense</div>", unsafe_allow_html=True)
     date_inp = st.date_input("Date", value=datetime.today(), label_visibility="collapsed")
     type_inp = st.selectbox("Type", ["income", "expense"], label_visibility="collapsed")
@@ -505,7 +491,7 @@ elif page_choice == "Debt Domination":
             if st.session_state.editing_debt_item == r["rowid"]:
                 render_debt_row_edit(r)
             else:
-                render_debt_row_html(r)
+                render_debt_row(r)
     st.markdown("<div class='section-subheader'>Add New Debt Item</div>", unsafe_allow_html=True)
     new_debt_name = st.text_input("Debt Name (e.g. 'Loft Credit Card')")
     new_debt_balance = st.number_input("Current Balance", min_value=0.0, format="%.2f")
@@ -514,7 +500,7 @@ elif page_choice == "Debt Domination":
     new_min_payment = st.text_input("Minimum Payment (Optional)")
     if st.button("Add Debt"):
         if new_debt_name.strip():
-            # Call your add_debt_item function here.
+            # Here, you would call your add_debt_item function.
             st.success("New debt item added (functionality assumed).")
             st.experimental_rerun()
     if st.session_state.active_payoff_plan is not None:
@@ -560,7 +546,7 @@ elif page_choice == "Budget Overview":
     total_exp = data_12mo[data_12mo["type"]=="expense"]["amount"].sum()
     leftover = total_inc - total_exp
     st.markdown(f"""
-    <div style='display: flex; justify-content: space-around; text-align: center; padding: 10px 0;'>
+    <div style='display: flex; justify-content: space-around; text-align:center; padding:10px 0;'>
       <div class='metric-box'>
          <div style='font-size:14px; color:#bbb;'>12-Month Income</div>
          <div style='font-size:20px; font-weight:bold; color:green;'>${total_inc:,.2f}</div>
