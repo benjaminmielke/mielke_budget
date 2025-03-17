@@ -1,57 +1,61 @@
 import streamlit as st
 import pandas as pd
-import calendar
-import uuid
-from datetime import datetime, date
-from dateutil.relativedelta import relativedelta
 from google.cloud import bigquery
 from google.oauth2 import service_account
-import streamlit.components.v1 as components
+from datetime import datetime, date
+import calendar
+import uuid
+from dateutil.relativedelta import relativedelta
 
-# ----------------------------
-# Declare custom component
-# ----------------------------
-# This component will render a row and return an action when a button is clicked.
-# (Make sure the folder "frontend" with the index.html file is in the same directory.)
-row_component = components.declare_component("row_component", path="frontend")
-
-# ----------------------------
-# Custom CSS (for non-component parts)
-# ----------------------------
+# =============================================================================
+# Custom CSS to force columns not to wrap and style our dark bar rows
+# =============================================================================
 st.markdown("""
 <style>
-/* General styling for other parts */
-.section-subheader {
-    font-size: 28px;
-    font-weight: bold;
-    color: #66ccff;
-    margin-top: 30px;
-    margin-bottom: 15px;
-    text-shadow: 0px 0px 3px #00ccff;
+/* Force st.columns to remain in one line */
+[data-testid="stHorizontalBlock"] {
+  flex-wrap: nowrap !important;
 }
-.calendar-container {
-    overflow-x: auto;
-    width: 100%;
+
+/* Dark bar for each row */
+.dark-bar {
+  background-color: #333;
+  padding: 10px;
+  border-radius: 5px;
+  margin-bottom: 8px;
 }
-.calendar-container table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 16px;
+
+/* Ensure text within the bar doesn't wrap unnecessarily */
+.dark-bar span {
+  white-space: nowrap;
 }
+
+/* Styling for metric boxes */
+.metric-box {
+  background-color: #333;
+  padding: 10px 15px;
+  border-radius: 10px;
+  margin: 5px;
+  text-align: center;
+}
+
+/* Mobile adjustments */
 @media only screen and (max-width: 600px) {
-    .calendar-container table {
-        font-size: 12px;
-    }
-    .calendar-container th, .calendar-container td {
-        padding: 5px;
-    }
+  .dark-bar {
+    padding: 5px;
+    font-size: 14px;
+  }
+  .metric-box {
+    font-size: 12px;
+    padding: 5px 8px;
+  }
 }
 </style>
 """, unsafe_allow_html=True)
 
-# ----------------------------
-# Helper functions and DB functions (unchanged from your app)
-# ----------------------------
+# =============================================================================
+# Helper Functions for Query Parameters (not used in native button approach)
+# =============================================================================
 def get_query_params_fallback():
     if hasattr(st, "query_params"):
         return st.query_params
@@ -61,6 +65,9 @@ def get_query_params_fallback():
 def clear_query_params():
     st.set_query_params()
 
+# =============================================================================
+# Session State Initialization
+# =============================================================================
 if "editing_budget_item" not in st.session_state:
     st.session_state.editing_budget_item = None
 if "temp_budget_edit_date" not in st.session_state:
@@ -92,7 +99,9 @@ if "temp_new_category" not in st.session_state:
 if "temp_new_item" not in st.session_state:
     st.session_state.temp_new_item = ""
 
-# BigQuery setup (using st.secrets)
+# =============================================================================
+# BigQuery Setup (using st.secrets)
+# =============================================================================
 bigquery_secrets = st.secrets["bigquery"]
 credentials = service_account.Credentials.from_service_account_info(bigquery_secrets)
 PROJECT_ID = bigquery_secrets["project_id"]
@@ -102,6 +111,9 @@ FACT_TABLE_NAME = "fact_budget_inputs"
 DEBT_TABLE_NAME = "fact_debt_items"
 client = bigquery.Client(credentials=credentials, project=PROJECT_ID)
 
+# =============================================================================
+# Database Functions
+# =============================================================================
 def load_fact_data():
     query = f"SELECT * FROM `{PROJECT_ID}.{DATASET_ID}.{FACT_TABLE_NAME}`"
     df = client.query(query).to_dataframe()
@@ -110,8 +122,10 @@ def load_fact_data():
 
 def save_fact_data(rows_df):
     table_id = f"{PROJECT_ID}.{DATASET_ID}.{FACT_TABLE_NAME}"
-    job = client.load_table_from_dataframe(rows_df, table_id,
-        job_config=bigquery.LoadJobConfig(write_disposition="WRITE_APPEND"))
+    job = client.load_table_from_dataframe(
+        rows_df, table_id,
+        job_config=bigquery.LoadJobConfig(write_disposition="WRITE_APPEND")
+    )
     job.result()
 
 def remove_fact_row(row_id):
@@ -207,8 +221,10 @@ def insert_monthly_payments_for_debt(debt_name, total_balance, debt_due_date_str
         })
     if rows_to_insert:
         df = pd.DataFrame(rows_to_insert)
-        job = client.load_table_from_dataframe(df, table_id,
-            job_config=bigquery.LoadJobConfig(write_disposition="WRITE_APPEND"))
+        job = client.load_table_from_dataframe(
+            df, table_id,
+            job_config=bigquery.LoadJobConfig(write_disposition="WRITE_APPEND")
+        )
         job.result()
 
 def load_dimension_rows(type_val):
@@ -228,61 +244,100 @@ def add_dimension_row(type_val, category_val, budget_item_val):
         "category": category_val,
         "budget_item": budget_item_val
     }])
-    job = client.load_table_from_dataframe(df, table_id,
-        job_config=bigquery.LoadJobConfig(write_disposition="WRITE_APPEND"))
+    job = client.load_table_from_dataframe(
+        df, table_id,
+        job_config=bigquery.LoadJobConfig(write_disposition="WRITE_APPEND")
+    )
     job.result()
 
 # =============================================================================
-# Custom Row Component for Budget Planning (Using our custom component)
+# Row Rendering Functions for Budget Planning using Native Buttons
 # =============================================================================
-def render_budget_row_component(row, color_class):
-    # Call our custom component, which returns a dictionary {action: "edit"|"remove", row_id: ...}
-    result = row_component(
-        row_id=row["rowid"],
-        date_str=row["date"].strftime("%Y-%m-%d"),
-        item_str=row["budget_item"],
-        amount_str=f"${row['amount']:,.2f}",
-        color_class=color_class,
-        key=row["rowid"]
-    )
-    if result is not None:
-        if result.get("action") == "edit":
-            st.session_state.editing_budget_item = row["rowid"]
+def render_budget_row(row, color_class):
+    """Render a single budget transaction row as a dark bar using st.columns and native buttons."""
+    row_id = row["rowid"]
+    date_str = row["date"].strftime("%Y-%m-%d")
+    item_str = row["budget_item"]
+    amount_str = f"${row['amount']:,.2f}"
+    with st.container():
+        st.markdown("<div class='dark-bar'>", unsafe_allow_html=True)
+        col_date, col_item, col_amt, col_edit, col_remove = st.columns([1, 3, 1, 1, 1])
+        col_date.markdown(f"<span style='color:#fff; font-weight:bold;'>{date_str}</span>", unsafe_allow_html=True)
+        col_item.markdown(f"<span style='color:#fff;'>{item_str}</span>", unsafe_allow_html=True)
+        col_amt.markdown(f"<span style='color:{color_class};'>{amount_str}</span>", unsafe_allow_html=True)
+        if col_edit.button("Edit", key=f"edit_{row_id}"):
+            st.session_state.editing_budget_item = row_id
             st.experimental_rerun()
-        elif result.get("action") == "remove":
-            remove_fact_row(row["rowid"])
+        if col_remove.button("❌", key=f"remove_{row_id}"):
+            remove_fact_row(row_id)
             st.experimental_rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
+
+def render_budget_row_edit(row, color_class):
+    """Render an editing interface for a budget transaction row using native inputs."""
+    row_id = row["rowid"]
+    item_str = row["budget_item"]
+    amount_str = f"${row['amount']:,.2f}"
+    st.markdown(f"<div class='dark-bar' style='background-color:#444; color:#fff; font-weight:bold;'>Editing: {item_str} ({amount_str})</div>", unsafe_allow_html=True)
+    st.session_state.temp_budget_edit_date = st.date_input("Date", value=row["date"], key=f"edit_date_{row_id}")
+    st.session_state.temp_budget_edit_amount = st.number_input("Amount", min_value=0.0, format="%.2f",
+                                                               value=float(row["amount"]), key=f"edit_amount_{row_id}")
+    col1, col2 = st.columns(2)
+    if col1.button("Save", key=f"save_{row_id}"):
+        update_fact_row(row_id, st.session_state.temp_budget_edit_date,
+                        st.session_state.temp_budget_edit_amount)
+        st.session_state.editing_budget_item = None
+        st.experimental_rerun()
+    if col2.button("Cancel", key=f"cancel_{row_id}"):
+        st.session_state.editing_budget_item = None
+        st.experimental_rerun()
 
 # =============================================================================
-# Custom Row Component for Debt Domination (Using our custom component)
+# Row Rendering Functions for Debt Domination using Native Buttons
 # =============================================================================
-def render_debt_row_component(row):
-    result = row_component(
-        row_id=row["rowid"],
-        date_str=row["debt_name"],
-        item_str=f"Due: {row['due_date'] if row['due_date'] else '(None)'}, Min: {row['minimum_payment'] if pd.notnull(row['minimum_payment']) else '(None)'}",
-        amount_str=f"${row['current_balance']:,.2f}",
-        color_class="red",
-        key=row["rowid"]
-    )
-    if result is not None:
-        if result.get("action") == "edit_debt":
-            st.session_state.editing_debt_item = row["rowid"]
+def render_debt_row(row):
+    """Render a single debt row as a dark bar using native buttons."""
+    row_id = row["rowid"]
+    row_name = row["debt_name"]
+    row_balance = row["current_balance"]
+    row_due = row["due_date"] if row["due_date"] else "(None)"
+    row_min = row["minimum_payment"] if pd.notnull(row["minimum_payment"]) else "(None)"
+    payoff_text = "Recalc" if row.get("payoff_plan_date") else "Payoff"
+    with st.container():
+        st.markdown("<div class='dark-bar'>", unsafe_allow_html=True)
+        col_name, col_info, col_amt, col_edit, col_payoff, col_remove = st.columns([1, 3, 1, 1, 1, 1])
+        col_name.markdown(f"<span style='color:#fff; font-weight:bold;'>{row_name}</span>", unsafe_allow_html=True)
+        col_info.markdown(f"<span style='color:#fff;'>Due: {row_due}, Min: {row_min}</span>", unsafe_allow_html=True)
+        col_amt.markdown(f"<span style='color:red;'>${row_balance:,.2f}</span>", unsafe_allow_html=True)
+        if col_edit.button("Edit", key=f"edit_debt_{row_id}"):
+            st.session_state.editing_debt_item = row_id
             st.experimental_rerun()
-        elif result.get("action") == "remove_debt":
-            remove_debt_item(row["rowid"])
+        if col_payoff.button(payoff_text, key=f"payoff_{row_id}"):
+            st.session_state.active_payoff_plan = row_id
             st.experimental_rerun()
-        elif result.get("action") == "payoff":
-            st.session_state.active_payoff_plan = row["rowid"]
+        if col_remove.button("❌", key=f"remove_debt_{row_id}"):
+            remove_debt_item(row_id)
             st.experimental_rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
 
-# =============================================================================
-# Process Query Parameters (if any) – not used in component approach
-# =============================================================================
-params = get_query_params_fallback()
-if "action" in params and "rowid" in params:
-    # Fallback processing (if needed)
-    pass
+def render_debt_row_edit(row):
+    """Render an editing interface for a debt row using native inputs."""
+    row_id = row["rowid"]
+    row_name = row["debt_name"]
+    row_balance = row["current_balance"]
+    row_due = row["due_date"] if row["due_date"] else "(None)"
+    row_min = row["minimum_payment"] if pd.notnull(row["minimum_payment"]) else "(None)"
+    st.markdown(f"<div class='dark-bar' style='background-color:#444; color:#fff; font-weight:bold;'>Editing: {row_name}</div>", unsafe_allow_html=True)
+    st.session_state.temp_new_balance = st.number_input("New Balance", min_value=0.0, format="%.2f",
+                                                         value=float(row_balance), key=f"edit_debt_balance_{row_id}")
+    col1, col2 = st.columns(2)
+    if col1.button("Save", key=f"save_debt_{row_id}"):
+        update_debt_item(row_id, st.session_state.temp_new_balance)
+        st.session_state.editing_debt_item = None
+        st.experimental_rerun()
+    if col2.button("Cancel", key=f"cancel_debt_{row_id}"):
+        st.session_state.editing_debt_item = None
+        st.experimental_rerun()
 
 # =============================================================================
 # Sidebar & Page Navigation
@@ -332,21 +387,22 @@ if page_choice == "Budget Planning":
     
     st.markdown(f"""
     <div style='display: flex; justify-content: space-around; text-align: center; padding: 10px 0;'>
-      <div style='background-color:#333; padding:10px 15px; border-radius:10px;'>
+      <div class='metric-box'>
          <div style='font-size:14px; color:#bbb;'>Total Income</div>
          <div style='font-size:20px; font-weight:bold; color:green;'>${total_income:,.2f}</div>
       </div>
-      <div style='background-color:#333; padding:10px 15px; border-radius:10px;'>
+      <div class='metric-box'>
          <div style='font-size:14px; color:#bbb;'>Total Expenses</div>
          <div style='font-size:20px; font-weight:bold; color:red;'>${total_expenses:,.2f}</div>
       </div>
-      <div style='background-color:#333; padding:10px 15px; border-radius:10px;'>
+      <div class='metric-box'>
          <div style='font-size:14px; color:#bbb;'>Leftover</div>
          <div style='font-size:20px; font-weight:bold; color:{"green" if leftover>=0 else "red"};'>${leftover:,.2f}</div>
       </div>
     </div>
     """, unsafe_allow_html=True)
     
+    # Calendar display
     days_in_month = calendar.monthrange(st.session_state.current_year, st.session_state.current_month)[1]
     first_weekday = (calendar.monthrange(st.session_state.current_year, st.session_state.current_month)[0] + 1) % 7
     cal_grid = [["" for _ in range(7)] for _ in range(6)]
@@ -367,6 +423,7 @@ if page_choice == "Budget Planning":
     cal_df = pd.DataFrame(cal_grid, columns=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"])
     st.markdown(f'<div class="calendar-container">{cal_df.to_html(index=False, escape=False)}</div>', unsafe_allow_html=True)
     
+    # Add New Income/Expense Form with drop-downs for Category and Budget Item
     st.markdown("<div class='section-subheader'>Add New Income/Expense</div>", unsafe_allow_html=True)
     date_inp = st.date_input("Date", value=datetime.today(), label_visibility="collapsed")
     type_inp = st.selectbox("Type", ["income", "expense"], label_visibility="collapsed")
@@ -427,13 +484,10 @@ if page_choice == "Budget Planning":
         st.write("No transactions found for this month.")
     else:
         for _, r in filtered_data.iterrows():
-            # Use our custom component to render each row.
-            # The component returns an action when a button is clicked.
             if st.session_state.editing_budget_item == r["rowid"]:
-                # If in editing mode, fall back to native editing
                 render_budget_row_edit(r, "#00cc00" if r["type"]=="income" else "#ff4444")
             else:
-                render_budget_row_component(r, "#00cc00" if r["type"]=="income" else "#ff4444")
+                render_budget_row_html(r, "#00cc00" if r["type"]=="income" else "#ff4444")
 
 # =============================================================================
 # Page 2: Debt Domination
@@ -451,7 +505,7 @@ elif page_choice == "Debt Domination":
             if st.session_state.editing_debt_item == r["rowid"]:
                 render_debt_row_edit(r)
             else:
-                render_debt_row_component(r)
+                render_debt_row_html(r)
     st.markdown("<div class='section-subheader'>Add New Debt Item</div>", unsafe_allow_html=True)
     new_debt_name = st.text_input("Debt Name (e.g. 'Loft Credit Card')")
     new_debt_balance = st.number_input("Current Balance", min_value=0.0, format="%.2f")
@@ -460,10 +514,9 @@ elif page_choice == "Debt Domination":
     new_min_payment = st.text_input("Minimum Payment (Optional)")
     if st.button("Add Debt"):
         if new_debt_name.strip():
-            # Here you would call your add_debt_item function.
+            # Call your add_debt_item function here.
             st.success("New debt item added (functionality assumed).")
             st.experimental_rerun()
-    
     if st.session_state.active_payoff_plan is not None:
         reloaded_debts = load_debt_items()
         match = reloaded_debts[reloaded_debts["rowid"] == st.session_state.active_payoff_plan]
@@ -508,15 +561,15 @@ elif page_choice == "Budget Overview":
     leftover = total_inc - total_exp
     st.markdown(f"""
     <div style='display: flex; justify-content: space-around; text-align: center; padding: 10px 0;'>
-      <div style='background-color:#333; padding:10px 15px; border-radius:10px;'>
+      <div class='metric-box'>
          <div style='font-size:14px; color:#bbb;'>12-Month Income</div>
          <div style='font-size:20px; font-weight:bold; color:green;'>${total_inc:,.2f}</div>
       </div>
-      <div style='background-color:#333; padding:10px 15px; border-radius:10px;'>
+      <div class='metric-box'>
          <div style='font-size:14px; color:#bbb;'>12-Month Expenses</div>
          <div style='font-size:20px; font-weight:bold; color:red;'>${total_exp:,.2f}</div>
       </div>
-      <div style='background-color:#333; padding:10px 15px; border-radius:10px;'>
+      <div class='metric-box'>
          <div style='font-size:14px; color:#bbb;'>Leftover</div>
          <div style='font-size:20px; font-weight:bold; color:{"green" if leftover>=0 else "red"};'>${leftover:,.2f}</div>
       </div>
