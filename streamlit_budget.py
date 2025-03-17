@@ -88,7 +88,6 @@ def get_query_params_fallback():
         return st.experimental_get_query_params()
 
 def clear_query_params():
-    # Clears query parameters
     if hasattr(st, "set_query_params"):
         st.set_query_params()
     else:
@@ -287,10 +286,10 @@ def render_budget_row_html(row, color_class):
       <div style="flex:1; margin-left:15px; color:#fff;">{item_str}</div>
       <div style="min-width:80px; margin-left:15px; color:{color_class};">{amount_str}</div>
       <div>
-         <a class="row-button" href="?action=edit&rowid={row_id}" target="_self">Edit</a>
+         <a class="row-button" href="?action=edit&rowid={row_id}" target="_self" onclick="window.location.href=this.href; return false;">Edit</a>
       </div>
       <div>
-         <a class="row-button remove" href="?action=remove&rowid={row_id}" target="_self">❌</a>
+         <a class="row-button remove" href="?action=remove&rowid={row_id}" target="_self" onclick="window.location.href=this.href; return false;">❌</a>
       </div>
     </div>
     """
@@ -340,13 +339,13 @@ def render_debt_row_html(row):
       <div style="flex:1; margin-left:15px; color:#fff;">Due: {row_due}, Min: {row_min}</div>
       <div style="min-width:80px; margin-left:15px; color:red;">${row_balance:,.2f}</div>
       <div>
-         <a class="row-button" href="?action=edit_debt&rowid={row_id}" target="_self">Edit</a>
+         <a class="row-button" href="?action=edit_debt&rowid={row_id}" target="_self" onclick="window.location.href=this.href; return false;">Edit</a>
       </div>
       <div>
-         <a class="row-button" href="?action=payoff&rowid={row_id}" target="_self">{payoff_text}</a>
+         <a class="row-button" href="?action=payoff&rowid={row_id}" target="_self" onclick="window.location.href=this.href; return false;">{payoff_text}</a>
       </div>
       <div>
-         <a class="row-button remove" href="?action=remove_debt&rowid={row_id}" target="_self">❌</a>
+         <a class="row-button remove" href="?action=remove_debt&rowid={row_id}" target="_self" onclick="window.location.href=this.href; return false;">❌</a>
       </div>
     </div>
     """
@@ -506,7 +505,7 @@ if page_choice == "Budget Planning":
     date_input = st.date_input("Date", value=datetime.today(), label_visibility="collapsed")
     type_input = st.selectbox("Type", ["income", "expense"], label_visibility="collapsed")
     
-    # Load dimension data for the selected type
+    # Load dimension data for selected type
     dimension_df = load_dimension_rows(type_input)
     all_categories = sorted(dimension_df["category"].unique())
     if not all_categories:
@@ -598,7 +597,7 @@ elif page_choice == "Debt Domination":
     new_min_payment = st.text_input("Minimum Payment (Optional)")
     if st.button("Add Debt"):
         if new_debt_name.strip():
-            # Here, call your add_debt_item function.
+            # Here you would call your add_debt_item function.
             st.success("New debt item added (functionality assumed).")
             st.rerun()
     
