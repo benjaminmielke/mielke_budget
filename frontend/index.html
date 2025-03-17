@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Row Component</title>
+    <!-- Import React and ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@16/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@16/umd/react-dom.production.min.js"></script>
+    <!-- Import Streamlit component library -->
+    <script src="https://unpkg.com/streamlit-component-lib@1.2.1/dist/index.min.js"></script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="text/javascript">
+      const e = React.createElement;
+      const Main = (props) => {
+        // props.args contains the data passed from Python
+        const { row_id, date_str, item_str, amount_str, color_class } = props.args;
+        
+        // Render a row bar with two buttons
+        return e(
+          "div",
+          {
+            style: {
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              backgroundColor: "#333",
+              padding: "10px",
+              borderRadius: "5px",
+              marginBottom: "8px",
+              width: "100%",
+              whiteSpace: "nowrap",
+              color: "#fff"
+            }
+          },
+          e("div", { style: { minWidth: "100px", fontWeight: "bold" } }, date_str),
+          e("div", { style: { flex: 1, marginLeft: "15px" } }, item_str),
+          e("div", { style: { minWidth: "80px", marginLeft: "15px", color: color_class } }, amount_str),
+          e(
+            "button",
+            {
+              onClick: () =>
+                window.Streamlit.setComponentValue({ action: "edit", row_id: row_id }),
+              style: { marginLeft: "10px" }
+            },
+            "Edit"
+          ),
+          e(
+            "button",
+            {
+              onClick: () =>
+                window.Streamlit.setComponentValue({ action: "remove", row_id: row_id }),
+              style: { marginLeft: "10px", backgroundColor: "#900", color: "#fff" }
+            },
+            "❌"
+          )
+        );
+      };
+
+      // Tell Streamlit that the component is ready.
+      window.Streamlit.setComponentReady();
+      // Render the component and send back the result when a button is clicked.
+      ReactDOM.render(
+        e(Main, { args: window.Streamlit.getComponentArgs() }),
+        document.getElementById("root")
+      );
+    </script>
+  </body>
+</html>
