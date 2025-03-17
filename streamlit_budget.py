@@ -87,11 +87,12 @@ def get_query_params_fallback():
     else:
         return st.experimental_get_query_params()
 
-def set_query_params_fallback(**kwargs):
+def clear_query_params():
+    # Clears query parameters
     if hasattr(st, "set_query_params"):
-        st.set_query_params(**kwargs)
+        st.set_query_params()
     else:
-        st.experimental_set_query_params(**kwargs)
+        st.experimental_set_query_params()
 
 # =============================================================================
 # Session State Initialization
@@ -191,7 +192,6 @@ def update_debt_item(row_id, new_balance):
     client.query(query).result()
 
 def insert_monthly_payments_for_debt(debt_name, total_balance, debt_due_date_str, payoff_date):
-    # Remove existing auto-payoff rows
     escaped_name = debt_name.replace("'", "''")
     query = f"""
     DELETE FROM `{PROJECT_ID}.{DATASET_ID}.{FACT_TABLE_NAME}`
@@ -316,11 +316,11 @@ def render_budget_row_edit(row, color_class):
         update_fact_row(row_id, st.session_state.temp_budget_edit_date,
                         st.session_state.temp_budget_edit_amount)
         st.session_state.editing_budget_item = None
-        set_query_params_fallback()
+        clear_query_params()
         st.rerun()
     if col2.button("Cancel", key=f"cancel_{row_id}"):
         st.session_state.editing_budget_item = None
-        set_query_params_fallback()
+        clear_query_params()
         st.rerun()
 
 # =============================================================================
@@ -372,11 +372,11 @@ def render_debt_row_edit(row):
     if col1.button("Save", key=f"save_debt_{row_id}"):
         update_debt_item(row_id, st.session_state.temp_new_balance)
         st.session_state.editing_debt_item = None
-        set_query_params_fallback()
+        clear_query_params()
         st.rerun()
     if col2.button("Cancel", key=f"cancel_debt_{row_id}"):
         st.session_state.editing_debt_item = None
-        set_query_params_fallback()
+        clear_query_params()
         st.rerun()
 
 # =============================================================================
@@ -388,23 +388,23 @@ if "action" in params and "rowid" in params:
     rowid = params["rowid"][0]
     if action == "edit":
         st.session_state.editing_budget_item = rowid
-        set_query_params_fallback()
+        clear_query_params()
         st.experimental_rerun()
     elif action == "remove":
         remove_fact_row(rowid)
-        set_query_params_fallback()
+        clear_query_params()
         st.experimental_rerun()
     elif action == "edit_debt":
         st.session_state.editing_debt_item = rowid
-        set_query_params_fallback()
+        clear_query_params()
         st.experimental_rerun()
     elif action == "remove_debt":
         remove_debt_item(rowid)
-        set_query_params_fallback()
+        clear_query_params()
         st.experimental_rerun()
     elif action == "payoff":
         st.session_state.active_payoff_plan = rowid
-        set_query_params_fallback()
+        clear_query_params()
         st.experimental_rerun()
 
 # =============================================================================
@@ -506,7 +506,7 @@ if page_choice == "Budget Planning":
     date_input = st.date_input("Date", value=datetime.today(), label_visibility="collapsed")
     type_input = st.selectbox("Type", ["income", "expense"], label_visibility="collapsed")
     
-    # Load dimension rows for selected type
+    # Load dimension data for the selected type
     dimension_df = load_dimension_rows(type_input)
     all_categories = sorted(dimension_df["category"].unique())
     if not all_categories:
@@ -598,8 +598,7 @@ elif page_choice == "Debt Domination":
     new_min_payment = st.text_input("Minimum Payment (Optional)")
     if st.button("Add Debt"):
         if new_debt_name.strip():
-            # Call your add_debt_item function here.
-            # For this example, we'll display a success message.
+            # Here, call your add_debt_item function.
             st.success("New debt item added (functionality assumed).")
             st.rerun()
     
@@ -619,11 +618,11 @@ elif page_choice == "Debt Domination":
             if col_debt1.button("Submit"):
                 insert_monthly_payments_for_debt(plan_name, plan_balance, plan_due, st.session_state.temp_payoff_date)
                 st.session_state.active_payoff_plan = None
-                set_query_params_fallback()
+                clear_query_params()
                 st.rerun()
             if col_debt2.button("Cancel"):
                 st.session_state.active_payoff_plan = None
-                set_query_params_fallback()
+                clear_query_params()
                 st.rerun()
 
 # =============================================================================
