@@ -99,18 +99,22 @@ if "temp_budget_edit_date" not in st.session_state:
     st.session_state.temp_budget_edit_date = datetime.today()
 if "temp_budget_edit_amount" not in st.session_state:
     st.session_state.temp_budget_edit_amount = 0.0
+
 if "editing_debt_item" not in st.session_state:
     st.session_state.editing_debt_item = None
 if "temp_new_balance" not in st.session_state:
     st.session_state.temp_new_balance = 0.0
+
 if "current_month" not in st.session_state:
     st.session_state.current_month = datetime.today().month
 if "current_year" not in st.session_state:
     st.session_state.current_year = datetime.today().year
+
 if "active_payoff_plan" not in st.session_state:
     st.session_state.active_payoff_plan = None
 if "temp_payoff_date" not in st.session_state:
     st.session_state.temp_payoff_date = datetime.today().date()
+
 if "show_new_category_form" not in st.session_state:
     st.session_state.show_new_category_form = False
 if "show_new_item_form" not in st.session_state:
@@ -145,8 +149,10 @@ def load_fact_data():
 
 def save_fact_data(rows_df):
     table_id = f"{PROJECT_ID}.{DATASET_ID}.{FACT_TABLE_NAME}"
-    job = client.load_table_from_dataframe(rows_df, table_id,
-        job_config=bigquery.LoadJobConfig(write_disposition="WRITE_APPEND"))
+    job = client.load_table_from_dataframe(
+        rows_df, table_id,
+        job_config=bigquery.LoadJobConfig(write_disposition="WRITE_APPEND")
+    )
     job.result()
 
 def remove_fact_row(row_id):
@@ -243,8 +249,10 @@ def insert_monthly_payments_for_debt(debt_name, total_balance, debt_due_date_str
         })
     if rows_to_insert:
         df = pd.DataFrame(rows_to_insert)
-        job = client.load_table_from_dataframe(df, table_id,
-            job_config=bigquery.LoadJobConfig(write_disposition="WRITE_APPEND"))
+        job = client.load_table_from_dataframe(
+            df, table_id,
+            job_config=bigquery.LoadJobConfig(write_disposition="WRITE_APPEND")
+        )
         job.result()
 
 def load_dimension_rows(type_val):
@@ -264,8 +272,10 @@ def add_dimension_row(type_val, category_val, budget_item_val):
         "category": category_val,
         "budget_item": budget_item_val
     }])
-    job = client.load_table_from_dataframe(df, table_id,
-        job_config=bigquery.LoadJobConfig(write_disposition="WRITE_APPEND"))
+    job = client.load_table_from_dataframe(
+        df, table_id,
+        job_config=bigquery.LoadJobConfig(write_disposition="WRITE_APPEND")
+    )
     job.result()
 
 # =============================================================================
@@ -277,7 +287,6 @@ def render_budget_row_html(row, color_class):
     date_str = row["date"].strftime("%Y-%m-%d")
     item_str = row["budget_item"]
     amount_str = f"${row['amount']:,.2f}"
-    # Append a timestamp to force a fresh URL each click
     ts = int(datetime.now().timestamp())
     html = f"""
     <div class="line-item">
@@ -285,10 +294,10 @@ def render_budget_row_html(row, color_class):
       <div style="flex:1; margin-left:15px; color:#fff;">{item_str}</div>
       <div style="min-width:80px; margin-left:15px; color:{color_class};">{amount_str}</div>
       <div>
-         <a class="row-button" href="?action=edit&rowid={row_id}&_={ts}" target="_self" onclick="window.location.href=this.href; return false;">Edit</a>
+         <a class="row-button" href="?action=edit&rowid={row_id}&_={ts}" target="_self" onclick="window.location.assign(this.href);">Edit</a>
       </div>
       <div>
-         <a class="row-button remove" href="?action=remove&rowid={row_id}&_={ts}" target="_self" onclick="window.location.href=this.href; return false;">❌</a>
+         <a class="row-button remove" href="?action=remove&rowid={row_id}&_={ts}" target="_self" onclick="window.location.assign(this.href);">❌</a>
       </div>
     </div>
     """
@@ -339,13 +348,13 @@ def render_debt_row_html(row):
       <div style="flex:1; margin-left:15px; color:#fff;">Due: {row_due}, Min: {row_min}</div>
       <div style="min-width:80px; margin-left:15px; color:red;">${row_balance:,.2f}</div>
       <div>
-         <a class="row-button" href="?action=edit_debt&rowid={row_id}&_={ts}" target="_self" onclick="window.location.href=this.href; return false;">Edit</a>
+         <a class="row-button" href="?action=edit_debt&rowid={row_id}&_={ts}" target="_self" onclick="window.location.assign(this.href);">Edit</a>
       </div>
       <div>
-         <a class="row-button" href="?action=payoff&rowid={row_id}&_={ts}" target="_self" onclick="window.location.href=this.href; return false;">{payoff_text}</a>
+         <a class="row-button" href="?action=payoff&rowid={row_id}&_={ts}" target="_self" onclick="window.location.assign(this.href);">{payoff_text}</a>
       </div>
       <div>
-         <a class="row-button remove" href="?action=remove_debt&rowid={row_id}&_={ts}" target="_self" onclick="window.location.href=this.href; return false;">❌</a>
+         <a class="row-button remove" href="?action=remove_debt&rowid={row_id}&_={ts}" target="_self" onclick="window.location.assign(this.href);">❌</a>
       </div>
     </div>
     """
@@ -442,7 +451,7 @@ if page_choice == "Budget Planning":
                 st.session_state.current_month += 1
             st.experimental_rerun()
     
-    # Load and filter fact data for the current month/year
+    # Load fact data and filter by current month/year
     fact_data = load_fact_data()
     fact_data.sort_values("date", ascending=True, inplace=True)
     filtered_data = fact_data[
@@ -491,10 +500,12 @@ if page_choice == "Budget Planning":
     cal_df = pd.DataFrame(cal_grid, columns=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"])
     st.markdown(f'<div class="calendar-container">{cal_df.to_html(index=False, escape=False)}</div>', unsafe_allow_html=True)
     
-    # Add New Income/Expense Form with Drop-Downs
+    # Add New Income/Expense Form with Drop-Downs for Category & Budget Item
     st.markdown("<div class='section-subheader'>Add New Income/Expense</div>", unsafe_allow_html=True)
     date_inp = st.date_input("Date", value=datetime.today(), label_visibility="collapsed")
     type_inp = st.selectbox("Type", ["income", "expense"], label_visibility="collapsed")
+    
+    # Load dimension data for selected type
     dim_df = load_dimension_rows(type_inp)
     cat_list = sorted(dim_df["category"].unique())
     if not cat_list:
@@ -581,7 +592,7 @@ elif page_choice == "Debt Domination":
     new_min_payment = st.text_input("Minimum Payment (Optional)")
     if st.button("Add Debt"):
         if new_debt_name.strip():
-            # Call add_debt_item function (implementation omitted for brevity)
+            # Call your add_debt_item function here.
             st.success("New debt item added (functionality assumed).")
             st.experimental_rerun()
     if st.session_state.active_payoff_plan is not None:
@@ -627,7 +638,7 @@ elif page_choice == "Budget Overview":
     total_exp = data_12mo[data_12mo["type"]=="expense"]["amount"].sum()
     leftover = total_inc - total_exp
     st.markdown(f"""
-    <div style='display:flex; justify-content:space-around; text-align:center; padding:10px 0;'>
+    <div style='display: flex; justify-content: space-around; text-align: center; padding: 10px 0;'>
       <div style='background-color:#333; padding:10px 15px; border-radius:10px;'>
          <div style='font-size:14px; color:#bbb;'>12-Month Income</div>
          <div style='font-size:20px; font-weight:bold; color:green;'>${total_inc:,.2f}</div>
