@@ -67,7 +67,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 1) Fallback for query params
+# 1) Query Parameters Fallback Functions
 # ─────────────────────────────────────────────────────────────────────────────
 def get_query_params_fallback():
     if hasattr(st, "query_params"):
@@ -82,7 +82,7 @@ def set_query_params_fallback(**kwargs):
         st.experimental_set_query_params(**kwargs)
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 2) Session State initialization
+# 2) Session State Initialization
 # ─────────────────────────────────────────────────────────────────────────────
 if "show_new_category_form" not in st.session_state:
     st.session_state.show_new_category_form = False
@@ -111,7 +111,7 @@ if "temp_payoff_date" not in st.session_state:
     st.session_state.temp_payoff_date = datetime.today().date()
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 3) Google Cloud & BigQuery setup using Streamlit secrets
+# 3) Google Cloud & BigQuery Setup Using Streamlit Secrets
 # ─────────────────────────────────────────────────────────────────────────────
 bigquery_secrets = st.secrets["bigquery"]
 credentials = service_account.Credentials.from_service_account_info(bigquery_secrets)
@@ -125,7 +125,7 @@ DEBT_TABLE_NAME = "fact_debt_items"
 client = bigquery.Client(credentials=credentials, project=PROJECT_ID)
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 4) Dimension table (categories/items)
+# 4) Database Functions
 # ─────────────────────────────────────────────────────────────────────────────
 def load_dimension_rows(type_val):
     query = f"""
@@ -145,15 +145,11 @@ def add_dimension_row(type_val, category_val, budget_item_val):
         "budget_item": budget_item_val
     }])
     job = client.load_table_from_dataframe(
-        df,
-        table_id,
+        df, table_id,
         job_config=bigquery.LoadJobConfig(write_disposition="WRITE_APPEND")
     )
     job.result()
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 5) Fact table (Budget Planning)
-# ─────────────────────────────────────────────────────────────────────────────
 def load_fact_data():
     query = f"SELECT * FROM `{PROJECT_ID}.{DATASET_ID}.{FACT_TABLE_NAME}`"
     df = client.query(query).to_dataframe()
@@ -163,8 +159,7 @@ def load_fact_data():
 def save_fact_data(rows_df):
     table_id = f"{PROJECT_ID}.{DATASET_ID}.{FACT_TABLE_NAME}"
     job = client.load_table_from_dataframe(
-        rows_df,
-        table_id,
+        rows_df, table_id,
         job_config=bigquery.LoadJobConfig(write_disposition="WRITE_APPEND")
     )
     job.result()
@@ -196,9 +191,6 @@ def remove_old_payoff_lines_for_debt(debt_name):
     """
     client.query(query).result()
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 6) Debt Domination table
-# ─────────────────────────────────────────────────────────────────────────────
 def load_debt_items():
     query = f"SELECT * FROM `{PROJECT_ID}.{DATASET_ID}.{DEBT_TABLE_NAME}`"
     df = client.query(query).to_dataframe()
@@ -225,8 +217,7 @@ def add_debt_item(debt_name, current_balance, due_date, min_payment):
         "payoff_plan_date": None
     }])
     job = client.load_table_from_dataframe(
-        df,
-        table_id,
+        df, table_id,
         job_config=bigquery.LoadJobConfig(write_disposition="WRITE_APPEND")
     )
     job.result()
@@ -262,9 +253,6 @@ def update_debt_payoff_plan_date(row_id, new_date):
         """
     client.query(query).result()
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 7) Insert monthly payments for payoff plan
-# ─────────────────────────────────────────────────────────────────────────────
 def insert_monthly_payments_for_debt(debt_name, total_balance, debt_due_date_str, payoff_date):
     remove_old_payoff_lines_for_debt(debt_name)
     digits = "".join(ch for ch in (debt_due_date_str or "") if ch.isdigit())
@@ -313,63 +301,13 @@ def insert_monthly_payments_for_debt(debt_name, total_balance, debt_due_date_str
     if rows_to_insert:
         df = pd.DataFrame(rows_to_insert)
         job = client.load_table_from_dataframe(
-            df,
-            table_id,
+            df, table_id,
             job_config=bigquery.LoadJobConfig(write_disposition="WRITE_APPEND")
         )
         job.result()
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 8) Safely read query params
-# ─────────────────────────────────────────────────────────────────────────────
-params = get_query_params_fallback()
-if "recalc" in params:
-    row_id = params["recalc"]
-    if isinstance(row_id, list):
-        row_id = row_id[0]
-    reloaded_df = load_debt_items()
-    match = reloaded_df[reloaded_df["rowid"] == row_id]
-    if not match.empty:
-        plan_data = match.iloc[0]
-        plan_name = plan_data["debt_name"]
-        plan_balance = plan_data["current_balance"]
-        plan_due = plan_data["due_date"] if plan_data["due_date"] else ""
-        plan_existing = plan_data["payoff_plan_date"] if plan_data["payoff_plan_date"] else datetime.today().date()
-        insert_monthly_payments_for_debt(plan_name, plan_balance, plan_due, plan_existing)
-    set_query_params_fallback()
-    st.experimental_rerun()
-
-if "payoff" in params:
-    row_id = params["payoff"]
-    if isinstance(row_id, list):
-        row_id = row_id[0]
-    st.session_state.active_payoff_plan = row_id
-    set_query_params_fallback()
-    st.experimental_rerun()
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 9) CSS snippet to style the “➕” button green (preserved)
-# ─────────────────────────────────────────────────────────────────────────────
-st.markdown("""
-<style>
-button[data-baseweb="button"] div:contains("➕") {
-    background-color: green !important;
-    color: white !important;
-    font-weight: bold !important;
-    border-radius: 50% !important;
-    padding: 0px 8px !important;
-}
-</style>
-""", unsafe_allow_html=True)
-
-# ─────────────────────────────────────────────────────────────────────────────
-# SIDEBAR with 3 pages
-# ─────────────────────────────────────────────────────────────────────────────
-st.sidebar.title("Mielke Finances")
-page_choice = st.sidebar.radio("Navigation", ["Budget Planning", "Debt Domination", "Budget Overview"])
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Helper function to render a Budget Planning row in one horizontal line
+# 5) Helper Functions for Rendering Rows
 # ─────────────────────────────────────────────────────────────────────────────
 def render_budget_row(row, color_class):
     row_id = row["rowid"]
@@ -380,10 +318,9 @@ def render_budget_row(row, color_class):
     
     with st.container():
         st.markdown('<div class="row-container">', unsafe_allow_html=True)
-        # Create a single row with 5 columns: date, item, amount, Edit/Save, Cancel/Remove
         cols = st.columns([1, 3, 1, 1, 1])
         if is_editing:
-            cols[0].markdown(f"<div style='color:#fff; font-weight:bold;'>{'Editing...'}</div>", unsafe_allow_html=True)
+            cols[0].markdown(f"<div style='color:#fff; font-weight:bold;'>Editing...</div>", unsafe_allow_html=True)
             cols[1].markdown(f"<div style='color:#fff;'>{item_str}</div>", unsafe_allow_html=True)
             cols[2].markdown(f"<div style='color:{color_class};'>{amount_str}</div>", unsafe_allow_html=True)
             if cols[3].button("Save", key=f"save_{row_id}"):
@@ -413,8 +350,115 @@ def render_budget_row(row, color_class):
             remove_fact_row(row_id)
             st.rerun()
 
+def render_debt_row(row):
+    row_id = row["rowid"]
+    row_name = row["debt_name"]
+    row_balance = row["current_balance"]
+    row_due = row["due_date"] if row["due_date"] else "(None)"
+    row_min = row["minimum_payment"] if pd.notnull(row["minimum_payment"]) else "(None)"
+    is_editing = (st.session_state.editing_debt_item == row_id)
+    
+    with st.container():
+        st.markdown('<div class="row-container">', unsafe_allow_html=True)
+        cols = st.columns([1, 3, 1, 1, 1])
+        if is_editing:
+            cols[0].markdown(f"<div style='color:#fff; font-weight:bold;'>{row_name}</div>", unsafe_allow_html=True)
+            cols[1].markdown(f"<div style='color:#fff;'>Due: {row_due}, Min: {row_min}</div>", unsafe_allow_html=True)
+            cols[2].markdown(f"<div style='color:#fff;'>{row_balance:,.2f}</div>", unsafe_allow_html=True)
+            if cols[3].button("Save", key=f"save_debt_{row_id}"):
+                update_debt_item(row_id, st.session_state.temp_new_balance)
+                st.session_state.editing_debt_item = None
+                st.rerun()
+            if cols[4].button("Cancel", key=f"cancel_debt_{row_id}"):
+                st.session_state.editing_debt_item = None
+                st.rerun()
+        else:
+            cols[0].markdown(f"<div style='color:#fff; font-weight:bold;'>{row_name}</div>", unsafe_allow_html=True)
+            cols[1].markdown(f"<div style='color:#fff;'>Due: {row_due}, Min: {row_min}</div>", unsafe_allow_html=True)
+            cols[2].markdown(f"<div style='color:red;'>{row_balance:,.2f}</div>", unsafe_allow_html=True)
+            if cols[3].button("Edit", key=f"edit_debt_{row_id}"):
+                st.session_state.editing_debt_item = row_id
+                st.rerun()
+            # Show either a "Recalc" or "Payoff" link based on payoff_plan_date existence
+            if row.get("payoff_plan_date"):
+                cols[3].markdown(
+                    f"""<div style="text-align:center;">
+                    <a href="?recalc={row_id}" style="display:inline-block; background-color:green; color:white; font-weight:bold; border-radius:5px; padding:6px 10px; text-decoration:none;">Recalc</a>
+                    </div>""",
+                    unsafe_allow_html=True
+                )
+            else:
+                cols[3].markdown(
+                    f"""<div style="text-align:center;">
+                    <a href="?payoff={row_id}" style="display:inline-block; background-color:yellow; color:black; font-weight:bold; border-radius:5px; padding:6px 10px; text-decoration:none;">Payoff</a>
+                    </div>""",
+                    unsafe_allow_html=True
+                )
+            if cols[4].button("❌", key=f"remove_debt_{row_id}"):
+                remove_debt_item(row_id)
+                remove_old_payoff_lines_for_debt(row_name)
+                st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
+    
+    if is_editing:
+        st.session_state.temp_new_balance = st.number_input("New Balance", min_value=0.0, format="%.2f",
+                                                             value=float(row_balance), key=f"edit_balance_{row_id}")
+        if st.button("❌", key=f"remove_debt_extra_{row_id}"):
+            remove_debt_item(row_id)
+            remove_old_payoff_lines_for_debt(row_name)
+            st.rerun()
+
 # ─────────────────────────────────────────────────────────────────────────────
-# PAGE 1: Budget Planning
+# 6) Read Query Params for Recalc/Payoff
+# ─────────────────────────────────────────────────────────────────────────────
+params = get_query_params_fallback()
+if "recalc" in params:
+    row_id = params["recalc"]
+    if isinstance(row_id, list):
+        row_id = row_id[0]
+    reloaded_df = load_debt_items()
+    match = reloaded_df[reloaded_df["rowid"] == row_id]
+    if not match.empty:
+        plan_data = match.iloc[0]
+        plan_name = plan_data["debt_name"]
+        plan_balance = plan_data["current_balance"]
+        plan_due = plan_data["due_date"] if plan_data["due_date"] else ""
+        plan_existing = plan_data["payoff_plan_date"] if plan_data["payoff_plan_date"] else datetime.today().date()
+        insert_monthly_payments_for_debt(plan_name, plan_balance, plan_due, plan_existing)
+    set_query_params_fallback()
+    st.experimental_rerun()
+
+if "payoff" in params:
+    row_id = params["payoff"]
+    if isinstance(row_id, list):
+        row_id = row_id[0]
+    st.session_state.active_payoff_plan = row_id
+    set_query_params_fallback()
+    st.experimental_rerun()
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 7) Style for the “➕” Button (Preserved)
+# ─────────────────────────────────────────────────────────────────────────────
+st.markdown("""
+<style>
+button[data-baseweb="button"] div:contains("➕") {
+    background-color: green !important;
+    color: white !important;
+    font-weight: bold !important;
+    border-radius: 50% !important;
+    padding: 0px 8px !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 8) Sidebar and Page Navigation
+# ─────────────────────────────────────────────────────────────────────────────
+st.sidebar.title("Mielke Finances")
+page_choice = st.sidebar.radio("Navigation", ["Budget Planning", "Debt Domination", "Budget Overview"])
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Main Page Content: if/elif/elif based on page_choice
 # ─────────────────────────────────────────────────────────────────────────────
 if page_choice == "Budget Planning":
     st.markdown("""
@@ -428,19 +472,21 @@ if page_choice == "Budget Planning":
         st.session_state.current_month = datetime.today().month
     if "current_year" not in st.session_state:
         st.session_state.current_year = datetime.today().year
+    
     current_month = st.session_state.current_month
     current_year = st.session_state.current_year
-
+    
     fact_data = load_fact_data()
     fact_data.sort_values("date", ascending=True, inplace=True)
     filtered_data = fact_data[
         (fact_data["date"].dt.month == current_month) &
         (fact_data["date"].dt.year == current_year)
     ].copy()
+    
     total_income = filtered_data[filtered_data["type"]=="income"]["amount"].sum()
     total_expenses = filtered_data[filtered_data["type"]=="expense"]["amount"].sum()
     leftover = total_income - total_expenses
-
+    
     st.markdown("""
     <style>
     table {
@@ -490,27 +536,24 @@ if page_choice == "Budget Planning":
     }
     </style>
     """, unsafe_allow_html=True)
-
+    
     st.markdown(f"""
     <div style='display: flex; justify-content: space-around; text-align: center; padding: 10px 0;'>
-        <div style='background-color: #333; padding: 10px 15px; border-radius: 10px; 
-                    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2);'>
+        <div style='background-color: #333; padding: 10px 15px; border-radius: 10px; box-shadow: 2px 2px 5px rgba(0,0,0,0.2);'>
             <div style='font-size: 14px; color: #bbb;'>Total Income</div>
             <div style='font-size: 20px; font-weight: bold; color: green;'>${total_income:,.2f}</div>
         </div>
-        <div style='background-color: #333; padding: 10px 15px; border-radius: 10px; 
-                    box-shadow: 2px 2px 5px rgba(0,0,0,0.2);'>
+        <div style='background-color: #333; padding: 10px 15px; border-radius: 10px; box-shadow: 2px 2px 5px rgba(0,0,0,0.2);'>
             <div style='font-size: 14px; color: #bbb;'>Total Expenses</div>
             <div style='font-size: 20px; font-weight: bold; color: red;'>${total_expenses:,.2f}</div>
         </div>
-        <div style='background-color: #333; padding: 10px 15px; border-radius: 10px; 
-                    box-shadow: 2px 2px 5px rgba(0,0,0,0.2);'>
+        <div style='background-color: #333; padding: 10px 15px; border-radius: 10px; box-shadow: 2px 2px 5px rgba(0,0,0,0.2);'>
             <div style='font-size: 14px; color: #bbb;'>Leftover</div>
-            <div style='font-size: 20px; font-weight: bold; color: {'green' if leftover>=0 else 'red'};'>${leftover:,.2f}</div>
+            <div style='font-size: 20px; font-weight: bold; color: {"green" if leftover>=0 else "red"};'>${leftover:,.2f}</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
-
+    
     nav_col1, nav_col2, nav_col3, nav_col4 = st.columns([0.25, 1, 2, 1])
     with nav_col2:
         if st.button("Previous Month"):
@@ -534,7 +577,7 @@ if page_choice == "Budget Planning":
             else:
                 st.session_state.current_month += 1
             st.rerun()
-
+    
     days_in_month = calendar.monthrange(current_year, current_month)[1]
     first_weekday = (calendar.monthrange(current_year, current_month)[0] + 1) % 7
     calendar_grid = [["" for _ in range(7)] for _ in range(6)]
@@ -555,7 +598,7 @@ if page_choice == "Budget Planning":
     cal_df = pd.DataFrame(calendar_grid, columns=["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"])
     calendar_html = cal_df.to_html(index=False, escape=False)
     st.markdown(f'<div class="calendar-container">{calendar_html}</div>', unsafe_allow_html=True)
-
+    
     st.markdown("<div class='section-subheader'>Add New Income/Expense</div>", unsafe_allow_html=True)
     cA, cB = st.columns([1, 3])
     with cA:
@@ -649,7 +692,7 @@ if page_choice == "Budget Planning":
             }])
             save_fact_data(tx_df)
             st.rerun()
-
+    
     st.markdown("<div class='section-subheader'>Transactions This Month</div>", unsafe_allow_html=True)
     if filtered_data.empty:
         st.write("No transactions found for this month.")
@@ -667,58 +710,6 @@ if page_choice == "Budget Planning":
                 for _, row in group_df.iterrows():
                     render_budget_row(row, "#ff4444")
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Helper function to render a Debt Domination row in one horizontal line
-# ─────────────────────────────────────────────────────────────────────────────
-def render_debt_row(row):
-    row_id = row["rowid"]
-    row_name = row["debt_name"]
-    row_balance = row["current_balance"]
-    row_due = row["due_date"] if row["due_date"] else "(None)"
-    row_min = row["minimum_payment"] if pd.notnull(row["minimum_payment"]) else "(None)"
-    is_editing = (st.session_state.editing_debt_item == row_id)
-    
-    with st.container():
-        st.markdown('<div class="row-container">', unsafe_allow_html=True)
-        cols = st.columns([1, 3, 1, 1, 1])
-        if is_editing:
-            cols[0].markdown(f"<div style='color:#fff; font-weight:bold;'>{row_name}</div>", unsafe_allow_html=True)
-            cols[1].markdown(f"<div style='color:#fff;'>Due: {row_due}, Min: {row_min}</div>", unsafe_allow_html=True)
-            cols[2].markdown(f"<div style='color:#fff;'>{row_balance:,.2f}</div>", unsafe_allow_html=True)
-            if cols[3].button("Save", key=f"save_debt_{row_id}"):
-                update_debt_item(row_id, st.session_state.temp_new_balance)
-                st.session_state.editing_debt_item = None
-                st.rerun()
-            if cols[4].button("Cancel", key=f"cancel_debt_{row_id}"):
-                st.session_state.editing_debt_item = None
-                st.rerun()
-        else:
-            cols[0].markdown(f"<div style='color:#fff; font-weight:bold;'>{row_name}</div>", unsafe_allow_html=True)
-            cols[1].markdown(f"<div style='color:#fff;'>Due: {row_due}, Min: {row_min}</div>", unsafe_allow_html=True)
-            cols[2].markdown(f"<div style='color:red;'>{row_balance:,.2f}</div>", unsafe_allow_html=True)
-            if cols[3].button("Edit", key=f"edit_debt_{row_id}"):
-                st.session_state.editing_debt_item = row_id
-                st.rerun()
-            # Show either a "Recalc" (if payoff plan exists) or "Payoff" link
-            if row.get("payoff_plan_date"):
-                cols[3].markdown(f"""<div style="text-align:center;"><a href="?recalc={row_id}" style="display:inline-block; background-color:green; color:white; font-weight:bold; border-radius:5px; padding:6px 10px; text-decoration:none;">Recalc</a></div>""", unsafe_allow_html=True)
-            else:
-                cols[3].markdown(f"""<div style="text-align:center;"><a href="?payoff={row_id}" style="display:inline-block; background-color:yellow; color:black; font-weight:bold; border-radius:5px; padding:6px 10px; text-decoration:none;">Payoff</a></div>""", unsafe_allow_html=True)
-            if cols[4].button("❌", key=f"remove_debt_{row_id}"):
-                remove_debt_item(row_id)
-                remove_old_payoff_lines_for_debt(row_name)
-                st.rerun()
-        st.markdown("</div>", unsafe_allow_html=True)
-    if is_editing:
-        st.session_state.temp_new_balance = st.number_input("New Balance", min_value=0.0, format="%.2f", value=float(row_balance), key=f"edit_balance_{row_id}")
-        if st.button("❌", key=f"remove_debt_extra_{row_id}"):
-            remove_debt_item(row_id)
-            remove_old_payoff_lines_for_debt(row_name)
-            st.rerun()
-
-# ─────────────────────────────────────────────────────────────────────────────
-# PAGE 2: Debt Domination
-# ─────────────────────────────────────────────────────────────────────────────
 elif page_choice == "Debt Domination":
     st.markdown("""
         <h1 style='text-align: center; font-size: 50px; font-weight: bold; color: black;
@@ -769,20 +760,7 @@ elif page_choice == "Debt Domination":
             if cancel_col.button("Cancel"):
                 st.session_state.active_payoff_plan = None
                 st.rerun()
-    st.subheader("Add a New Debt Item")
-    new_debt_name = st.text_input("Debt Name (e.g. 'Loft Credit Card')", "")
-    new_debt_balance = st.number_input("Current Balance", min_value=0.0, format="%.2f", value=0.0)
-    due_date_options = ["(None)"] + [f"{d}st" if d==1 else f"{d}nd" if d==2 else f"{d}rd" if d==3 else f"{d}th" for d in range(1,32)]
-    new_due_date = st.selectbox("Due Date (Optional)", due_date_options, index=0)
-    new_min_payment = st.text_input("Minimum Payment (Optional, blank=none)")
-    if st.button("Add Debt"):
-        if new_debt_name.strip():
-            add_debt_item(new_debt_name.strip(), new_debt_balance, new_due_date, new_min_payment)
-        st.rerun()
 
-# ─────────────────────────────────────────────────────────────────────────────
-# PAGE 3: Budget Overview (Forward 12 months)
-# ─────────────────────────────────────────────────────────────────────────────
 elif page_choice == "Budget Overview":
     st.markdown("""
         <h1 style='text-align: center; font-size: 50px; font-weight: bold; color: black;
@@ -813,7 +791,7 @@ elif page_choice == "Budget Overview":
         </div>
         <div style='background-color:#333; padding:10px 15px; border-radius:10px; box-shadow:2px 2px 5px rgba(0,0,0,0.2);'>
             <div style='font-size:14px; color:#bbb;'>12-Month Leftover</div>
-            <div style='font-size:20px; font-weight:bold; color:{'green' if leftover_12>=0 else 'red'};'>
+            <div style='font-size:20px; font-weight:bold; color:{"green" if leftover_12>=0 else "red"};'>
                 ${leftover_12:,.2f}
             </div>
         </div>
@@ -844,7 +822,7 @@ elif page_choice == "Budget Overview":
                     <span style="color:red; font-weight:bold;">Expenses:</span> ${exp_val:,.2f}
                 </div>
                 <div>
-                    <span style="color:{'green' if leftover_val>=0 else 'red'}; font-weight:bold;">
+                    <span style="color:{"green" if leftover_val>=0 else "red"}; font-weight:bold;">
                         Leftover: ${leftover_val:,.2f}
                     </span>
                 </div>
