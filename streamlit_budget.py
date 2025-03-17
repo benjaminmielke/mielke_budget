@@ -9,28 +9,29 @@ import uuid
 from dateutil.relativedelta import relativedelta
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Custom CSS for improved mobile layout
+# Custom CSS for improved mobile layout and bar styling for line items
 # ─────────────────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-/* Custom styles for line items */
+/* Bar style for each line item */
 .line-item {
   display: flex;
-  flex-direction: row;
   align-items: center;
   justify-content: space-between;
+  background-color: #333;
   padding: 10px;
   border-radius: 5px;
+  margin-bottom: 8px;
+  white-space: nowrap;
 }
 
-/* Mobile adjustments for line items */
+/* Mobile adjustments */
 @media only screen and (max-width: 600px) {
   .line-item {
     padding: 5px;
     font-size: 14px;
-    white-space: nowrap;
   }
-  .line-item > span {
+  .line-item div {
     overflow: hidden;
     text-overflow: ellipsis;
     flex-shrink: 1;
@@ -41,20 +42,18 @@ st.markdown("""
   }
 }
 
-/* Calendar container to enable horizontal scrolling */
+/* Calendar container for horizontal scrolling on small screens */
 .calendar-container {
   overflow-x: auto;
   width: 100%;
 }
 
-/* Default calendar table styles */
 .calendar-container table {
   width: 100%;
   border-collapse: collapse;
   font-size: 16px;
 }
 
-/* Mobile adjustments for calendar */
 @media only screen and (max-width: 600px) {
   .calendar-container table {
     font-size: 12px;
@@ -70,22 +69,12 @@ st.markdown("""
 # 1) Fallback for query params
 # ─────────────────────────────────────────────────────────────────────────────
 def get_query_params_fallback():
-    """
-    Safely read query params:
-    - If st.query_params exists (newer Streamlit), use it.
-    - Else fallback to st.experimental_get_query_params (older Streamlit).
-    """
     if hasattr(st, "query_params"):
         return st.query_params
     else:
         return st.experimental_get_query_params()
 
 def set_query_params_fallback(**kwargs):
-    """
-    Safely set query params:
-    - If st.set_query_params exists (newer Streamlit), use it.
-    - Else fallback to st.experimental_set_query_params (older Streamlit).
-    """
     if hasattr(st, "set_query_params"):
         st.set_query_params(**kwargs)
     else:
@@ -103,7 +92,6 @@ if "temp_new_category" not in st.session_state:
 if "temp_new_item" not in st.session_state:
     st.session_state.temp_new_item = ""
 
-# For Budget line items
 if "editing_budget_item" not in st.session_state:
     st.session_state.editing_budget_item = None
 if "temp_budget_edit_date" not in st.session_state:
@@ -111,13 +99,11 @@ if "temp_budget_edit_date" not in st.session_state:
 if "temp_budget_edit_amount" not in st.session_state:
     st.session_state.temp_budget_edit_amount = 0.0
 
-# For Debt Domination
 if "editing_debt_item" not in st.session_state:
     st.session_state.editing_debt_item = None
 if "temp_new_balance" not in st.session_state:
     st.session_state.temp_new_balance = 0.0
 
-# For “Payoff Plan” or “Recalc” logic
 if "active_payoff_plan" not in st.session_state:
     st.session_state.active_payoff_plan = None
 if "temp_payoff_date" not in st.session_state:
@@ -126,7 +112,6 @@ if "temp_payoff_date" not in st.session_state:
 # ─────────────────────────────────────────────────────────────────────────────
 # 3) Google Cloud & BigQuery setup using Streamlit secrets
 # ─────────────────────────────────────────────────────────────────────────────
-# Load credentials from the Streamlit secrets under the [bigquery] key.
 bigquery_secrets = st.secrets["bigquery"]
 credentials = service_account.Credentials.from_service_account_info(bigquery_secrets)
 PROJECT_ID = bigquery_secrets["project_id"]
@@ -348,7 +333,6 @@ def insert_monthly_payments_for_debt(debt_name, total_balance, debt_due_date_str
 # ─────────────────────────────────────────────────────────────────────────────
 params = get_query_params_fallback()
 
-# If "recalc"
 if "recalc" in params:
     row_id = params["recalc"]
     if isinstance(row_id, list):
@@ -365,7 +349,6 @@ if "recalc" in params:
     set_query_params_fallback()
     st.experimental_rerun()
 
-# If "payoff"
 if "payoff" in params:
     row_id = params["payoff"]
     if isinstance(row_id, list):
@@ -375,7 +358,7 @@ if "payoff" in params:
     st.experimental_rerun()
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 9) CSS snippet to style the “➕” button green (preserved from before)
+# 9) CSS snippet to style the “➕” button green (preserved)
 # ─────────────────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
@@ -406,45 +389,36 @@ def render_budget_row(row, color_class):
     is_editing = (st.session_state.editing_budget_item == row_id)
     
     if is_editing:
-        with st.container():
-            st.markdown(f"""
-            <div class="line-item">
-                <span style="min-width: 100px; font-weight:bold; color:#fff;">Editing...</span>
-                <span style="flex:1; margin-left:15px; color:#fff;">{item_str}</span>
-                <span style="min-width:80px; margin-left:15px; color:{color_class};">{amount_str}</span>
-            </div>
-            """, unsafe_allow_html=True)
-            st.session_state.temp_budget_edit_date = st.date_input(
-                "Date", value=row["date"], key=f"edit_date_{row_id}"
-            )
-            st.session_state.temp_budget_edit_amount = st.number_input(
-                "Amount", min_value=0.0, format="%.2f", 
-                value=float(row["amount"]), key=f"edit_amount_{row_id}"
-            )
-            col1, col2 = st.columns(2)
-            if col1.button("Save", key=f"save_{row_id}"):
-                update_fact_row(
-                    row_id, 
-                    st.session_state.temp_budget_edit_date,
-                    st.session_state.temp_budget_edit_amount
-                )
-                st.session_state.editing_budget_item = None
-                st.rerun()
-            if col2.button("Cancel", key=f"cancel_{row_id}"):
-                st.session_state.editing_budget_item = None
-                st.rerun()
+        st.markdown(f"""
+        <div class="line-item">
+            <div style="min-width: 100px; font-weight: bold; color: #fff;">Editing...</div>
+            <div style="flex: 1; margin-left: 15px; color: #fff;">{item_str}</div>
+            <div style="min-width: 80px; margin-left: 15px; color: {color_class};">{amount_str}</div>
+        </div>
+        """, unsafe_allow_html=True)
+        st.session_state.temp_budget_edit_date = st.date_input("Date", value=row["date"], key=f"edit_date_{row_id}")
+        st.session_state.temp_budget_edit_amount = st.number_input("Amount", min_value=0.0, format="%.2f",
+                                                                   value=float(row["amount"]), key=f"edit_amount_{row_id}")
+        col1, col2 = st.columns(2)
+        if col1.button("Save", key=f"save_{row_id}"):
+            update_fact_row(row_id, st.session_state.temp_budget_edit_date,
+                            st.session_state.temp_budget_edit_amount)
+            st.session_state.editing_budget_item = None
+            st.rerun()
+        if col2.button("Cancel", key=f"cancel_{row_id}"):
+            st.session_state.editing_budget_item = None
+            st.rerun()
         if st.button("❌", key=f"remove_{row_id}"):
             remove_fact_row(row_id)
             st.rerun()
     else:
-        with st.container():
-            st.markdown(f"""
-            <div class="line-item">
-                <span style="min-width: 100px; font-weight:bold; color:#fff;">{date_str}</span>
-                <span style="flex:1; margin-left:15px; color:#fff;">{item_str}</span>
-                <span style="min-width:80px; margin-left:15px; color:{color_class};">{amount_str}</span>
-            </div>
-            """, unsafe_allow_html=True)
+        st.markdown(f"""
+        <div class="line-item">
+            <div style="min-width: 100px; font-weight: bold; color: #fff;">{date_str}</div>
+            <div style="flex: 1; margin-left: 15px; color: #fff;">{item_str}</div>
+            <div style="min-width: 80px; margin-left: 15px; color: {color_class};">{amount_str}</div>
+        </div>
+        """, unsafe_allow_html=True)
         col1, col2 = st.columns([0.5, 0.5])
         if col1.button("Edit", key=f"editbtn_{row_id}"):
             st.session_state.editing_budget_item = row_id
@@ -459,13 +433,11 @@ def render_budget_row(row, color_class):
 if page_choice == "Budget Planning":
     st.markdown("""
         <h1 style='text-align: center; font-size: 50px; font-weight: bold; 
-                   color: black; text-shadow: 0px 0px 10px #00ccff, 
-                                 0px 0px 20px #00ccff;'>
+                   color: black; text-shadow: 0px 0px 10px #00ccff, 0px 0px 20px #00ccff;'>
             Mielke Budget
         </h1>
     """, unsafe_allow_html=True)
 
-    # Initialize month/year
     if "current_month" not in st.session_state:
         st.session_state.current_month = datetime.today().month
     if "current_year" not in st.session_state:
@@ -486,7 +458,6 @@ if page_choice == "Budget Planning":
     total_expenses = filtered_data[filtered_data["type"]=="expense"]["amount"].sum()
     leftover = total_income - total_expenses
 
-    # Basic CSS for table (preserved)
     st.markdown("""
     <style>
     table {
@@ -541,28 +512,23 @@ if page_choice == "Budget Planning":
     </style>
     """, unsafe_allow_html=True)
 
-    # Display top metrics
     st.markdown(f"""
     <div style='display: flex; justify-content: space-around; text-align: center; padding: 10px 0;'>
-        <div style='background-color: #333; padding: 10px 15px; border-radius: 10px; 
-                    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2);'>
+        <div style='background-color: #333; padding: 10px 15px; border-radius: 10px; box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2);'>
             <div style='font-size: 14px; color: #bbb;'>Total Income</div>
             <div style='font-size: 20px; font-weight: bold; color: green;'>${total_income:,.2f}</div>
         </div>
-        <div style='background-color: #333; padding: 10px 15px; border-radius: 10px; 
-                    box-shadow: 2px 2px 5px rgba(0,0,0,0.2);'>
+        <div style='background-color: #333; padding: 10px 15px; border-radius: 10px; box-shadow: 2px 2px 5px rgba(0,0,0,0.2);'>
             <div style='font-size: 14px; color: #bbb;'>Total Expenses</div>
             <div style='font-size: 20px; font-weight: bold; color: red;'>${total_expenses:,.2f}</div>
         </div>
-        <div style='background-color: #333; padding: 10px 15px; border-radius: 10px; 
-                    box-shadow: 2px 2px 5px rgba(0,0,0,0.2);'>
+        <div style='background-color: #333; padding: 10px 15px; border-radius: 10px; box-shadow: 2px 2px 5px rgba(0,0,0,0.2);'>
             <div style='font-size: 14px; color: #bbb;'>Leftover</div>
             <div style='font-size: 20px; font-weight: bold; color: {'green' if leftover>=0 else 'red'};'>${leftover:,.2f}</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-    # Month navigation
     nav_col1, nav_col2, nav_col3, nav_col4 = st.columns([0.25, 1, 2, 1])
     with nav_col2:
         if st.button("Previous Month"):
@@ -572,14 +538,12 @@ if page_choice == "Budget Planning":
             else:
                 st.session_state.current_month -= 1
             st.rerun()
-
     with nav_col3:
         st.markdown(f"""
         <div style='text-align: center; font-size: 24px; font-weight: bold; padding: 10px;'>
             {calendar.month_name[current_month]} {current_year}
         </div>
         """, unsafe_allow_html=True)
-
     with nav_col4:
         if st.button("Next Month"):
             if st.session_state.current_month == 12:
@@ -589,12 +553,10 @@ if page_choice == "Budget Planning":
                 st.session_state.current_month += 1
             st.rerun()
 
-    # Build a day-grid calendar for the selected month
     days_in_month = calendar.monthrange(current_year, current_month)[1]
-    first_weekday = (calendar.monthrange(current_year, current_month)[0]+1)%7
+    first_weekday = (calendar.monthrange(current_year, current_month)[0] + 1) % 7
     calendar_grid = [["" for _ in range(7)] for _ in range(6)]
     day_counter = 1
-
     for week in range(6):
         for weekday in range(7):
             if week == 0 and weekday < first_weekday:
@@ -608,31 +570,25 @@ if page_choice == "Budget Planning":
                 cell_html += f"<br><span style='color:{color};'>${row['amount']:,.2f} ({row['budget_item']})</span>"
             calendar_grid[week][weekday] = cell_html
             day_counter += 1
-
-    cal_df = pd.DataFrame(calendar_grid, columns=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"])
+    cal_df = pd.DataFrame(calendar_grid, columns=["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"])
     calendar_html = cal_df.to_html(index=False, escape=False)
     st.markdown(f'<div class="calendar-container">{calendar_html}</div>', unsafe_allow_html=True)
 
     st.markdown("<div class='section-subheader'>Add New Income/Expense</div>", unsafe_allow_html=True)
-
-    # Form to add Income/Expense
     cA, cB = st.columns([1, 3])
     with cA:
         st.write("Date:")
     with cB:
         date_input = st.date_input("", value=datetime.today(), label_visibility="collapsed")
-
     cA, cB = st.columns([1, 3])
     with cA:
         st.write("Type:")
     with cB:
         type_input = st.selectbox("", ["income", "expense"], label_visibility="collapsed")
-
     dimension_df = load_dimension_rows(type_input)
     all_categories = sorted(dimension_df["category"].unique())
     if not all_categories:
         all_categories = ["(No categories yet)"]
-
     cA, cB = st.columns([1, 2.8])
     with cA:
         st.write("Category:")
@@ -643,7 +599,6 @@ if page_choice == "Budget Planning":
         with cat_plus:
             if st.button("➕", key="cat_plus"):
                 st.session_state.show_new_category_form = True
-
     if st.session_state.show_new_category_form:
         st.write("Add New Category")
         st.session_state.temp_new_category = st.text_input("Category Name", st.session_state.temp_new_category)
@@ -658,12 +613,10 @@ if page_choice == "Budget Planning":
         if cc2.button("Cancel"):
             st.session_state.show_new_category_form = False
             st.session_state.temp_new_category = ""
-
     items_for_cat = dimension_df[dimension_df["category"] == category_input]["budget_item"].unique()
     items_for_cat = [i for i in items_for_cat if i != ""]
     if not items_for_cat:
         items_for_cat = ["(No items yet)"]
-
     cA, cB = st.columns([1, 2.8])
     with cA:
         st.write("Budget Item:")
@@ -674,7 +627,6 @@ if page_choice == "Budget Planning":
         with item_plus:
             if st.button("➕", key="item_plus"):
                 st.session_state.show_new_item_form = True
-
     if st.session_state.show_new_item_form:
         st.write(f"Add New Item for Category: {category_input}")
         st.session_state.temp_new_item = st.text_input("New Budget Item", st.session_state.temp_new_item)
@@ -689,19 +641,16 @@ if page_choice == "Budget Planning":
         if ic2.button("Cancel"):
             st.session_state.show_new_item_form = False
             st.session_state.temp_new_item = ""
-
     cA, cB = st.columns([1, 3])
     with cA:
         st.write("Amount:")
     with cB:
         amount_input = st.number_input("", min_value=0.0, format="%.2f", label_visibility="collapsed")
-
     cA, cB = st.columns([1, 3])
     with cA:
         st.write("Note:")
     with cB:
         note_input = st.text_area("", label_visibility="collapsed")
-
     cX, cY = st.columns([1, 3])
     with cY:
         if st.button("Add Transaction"):
@@ -718,21 +667,17 @@ if page_choice == "Budget Planning":
             }])
             save_fact_data(tx_df)
             st.rerun()
-
     st.markdown("<div class='section-subheader'>Transactions This Month</div>", unsafe_allow_html=True)
-
     if filtered_data.empty:
         st.write("No transactions found for this month.")
     else:
-        inc_data = filtered_data[filtered_data["type"] == "income"]
-        exp_data = filtered_data[filtered_data["type"] == "expense"]
-
+        inc_data = filtered_data[filtered_data["type"]=="income"]
+        exp_data = filtered_data[filtered_data["type"]=="expense"]
         if not inc_data.empty:
             for cat_name, group_df in inc_data.groupby("category"):
                 st.markdown(f"<div class='category-header'>{cat_name}</div>", unsafe_allow_html=True)
                 for _, row in group_df.iterrows():
                     render_budget_row(row, "#00cc00")
-
         if not exp_data.empty:
             for cat_name, group_df in exp_data.groupby("category"):
                 st.markdown(f"<div class='category-header'>{cat_name}</div>", unsafe_allow_html=True)
@@ -745,27 +690,21 @@ if page_choice == "Budget Planning":
 elif page_choice == "Debt Domination":
     st.markdown("""
         <h1 style='text-align: center; font-size: 50px; font-weight: bold; 
-                   color: black; text-shadow: 0px 0px 10px #00ccff,
-                                 0px 0px 20px #00ccff;'>
+                   color: black; text-shadow: 0px 0px 10px #00ccff, 0px 0px 20px #00ccff;'>
             Debt Domination
         </h1>
     """, unsafe_allow_html=True)
-
     debt_df = load_debt_items()
     total_debt = debt_df["current_balance"].sum() if not debt_df.empty else 0.0
-
     st.markdown(f"""
     <div style='display: flex; justify-content: space-around; text-align: center; padding:10px 0;'>
-        <div style='background-color:#333; padding:10px 15px; border-radius:10px;
-                    box-shadow:2px 2px 5px rgba(0,0,0,0.2);'>
+        <div style='background-color:#333; padding:10px 15px; border-radius:10px; box-shadow:2px 2px 5px rgba(0,0,0,0.2);'>
             <div style='font-size:14px; color:#bbb;'>Total Debt</div>
             <div style='font-size:20px; font-weight:bold; color:red;'>${total_debt:,.2f}</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
-
     st.subheader("Your Debts")
-
     if debt_df.empty:
         st.write("No debt items found.")
     else:
@@ -776,45 +715,37 @@ elif page_choice == "Debt Domination":
             row_due = row["due_date"] if row["due_date"] else "(None)"
             row_min = row["minimum_payment"] if pd.notnull(row["minimum_payment"]) else None
             plan_date = row["payoff_plan_date"] if pd.notnull(row["payoff_plan_date"]) else None
-
             is_editing = (st.session_state.editing_debt_item == row_id)
-
             if is_editing:
-                with st.container():
-                    st.markdown(f"""
-                    <div class="line-item">
-                        <span style="min-width: 60px; font-weight:bold; color:#fff;">{row_name}</span>
-                        <span style="flex:1; margin-left:15px; color:#fff;">Due: {row_due}, Min: {row_min if row_min else "(None)"}</span>
-                    </div>
-                    """, unsafe_allow_html=True)
-                    st.session_state.temp_new_balance = st.number_input(
-                        "New Balance",
-                        min_value=0.0,
-                        format="%.2f",
-                        key=f"edit_balance_{row_id}",
-                        value=float(row_balance)
-                    )
-                    s_col, c_col = st.columns(2)
-                    if s_col.button("Save", key=f"save_debt_{row_id}"):
-                        update_debt_item(row_id, st.session_state.temp_new_balance)
-                        st.session_state.editing_debt_item = None
-                        st.rerun()
-                    if c_col.button("Cancel", key=f"cancel_debt_{row_id}"):
-                        st.session_state.editing_debt_item = None
-                        st.rerun()
+                st.markdown(f"""
+                <div class="line-item">
+                    <div style="min-width: 60px; font-weight:bold; color:#fff;">{row_name}</div>
+                    <div style="flex:1; margin-left:15px; color:#fff;">Due: {row_due}, Min: {row_min if row_min else "(None)"}</div>
+                </div>
+                """, unsafe_allow_html=True)
+                st.session_state.temp_new_balance = st.number_input("New Balance", min_value=0.0,
+                                                                      format="%.2f", key=f"edit_balance_{row_id}",
+                                                                      value=float(row_balance))
+                s_col, c_col = st.columns(2)
+                if s_col.button("Save", key=f"save_debt_{row_id}"):
+                    update_debt_item(row_id, st.session_state.temp_new_balance)
+                    st.session_state.editing_debt_item = None
+                    st.rerun()
+                if c_col.button("Cancel", key=f"cancel_debt_{row_id}"):
+                    st.session_state.editing_debt_item = None
+                    st.rerun()
                 if st.button("❌", key=f"remove_debt_{row_id}"):
                     remove_debt_item(row_id)
                     remove_old_payoff_lines_for_debt(row_name)
                     st.rerun()
             else:
-                with st.container():
-                    st.markdown(f"""
-                    <div class="line-item">
-                        <span style="min-width: 60px; font-weight:bold; color:#fff;">{row_name}</span>
-                        <span style="flex:1; margin-left:15px; color:#fff;">Due: {row_due}, Min: {row_min if row_min else "(None)"}</span>
-                        <span style="min-width:60px; margin-left:15px; color:red;">${row_balance:,.2f}</span>
-                    </div>
-                    """, unsafe_allow_html=True)
+                st.markdown(f"""
+                <div class="line-item">
+                    <div style="min-width: 60px; font-weight:bold; color:#fff;">{row_name}</div>
+                    <div style="flex:1; margin-left:15px; color:#fff;">Due: {row_due}, Min: {row_min if row_min else "(None)"}</div>
+                    <div style="min-width:60px; margin-left:15px; color:red;">${row_balance:,.2f}</div>
+                </div>
+                """, unsafe_allow_html=True)
                 col1, col_mid, col2 = st.columns([0.25, 0.50, 0.25])
                 if col1.button("Edit", key=f"edit_debt_{row_id}"):
                     st.session_state.editing_debt_item = row_id
@@ -824,8 +755,7 @@ elif page_choice == "Debt Domination":
                     <div style="text-align:center;">
                         <a href="?recalc={row_id}" 
                            style="display:inline-block; background-color:green; color:white; 
-                                  font-weight:bold; border-radius:5px; padding:6px 10px; 
-                                  text-decoration:none;">
+                                  font-weight:bold; border-radius:5px; padding:6px 10px; text-decoration:none;">
                             Recalc
                         </a>
                     </div>
@@ -836,8 +766,7 @@ elif page_choice == "Debt Domination":
                     <div style="text-align:center;">
                         <a href="?payoff={row_id}" 
                            style="display:inline-block; background-color:yellow; color:black; 
-                                  font-weight:bold; border-radius:5px; padding:6px 10px; 
-                                  text-decoration:none;">
+                                  font-weight:bold; border-radius:5px; padding:6px 10px; text-decoration:none;">
                             Payoff
                         </a>
                     </div>
@@ -847,7 +776,6 @@ elif page_choice == "Debt Domination":
                     remove_debt_item(row_id)
                     remove_old_payoff_lines_for_debt(row_name)
                     st.rerun()
-
     if st.session_state.active_payoff_plan is not None:
         reloaded_df = load_debt_items()
         match = reloaded_df[reloaded_df["rowid"] == st.session_state.active_payoff_plan]
@@ -858,19 +786,12 @@ elif page_choice == "Debt Domination":
             plan_due = plan_data["due_date"] if plan_data["due_date"] else ""
             st.markdown("<hr>", unsafe_allow_html=True)
             st.subheader(f"Payoff Plan for {plan_name}")
-
-            st.session_state.temp_payoff_date = st.date_input(
-                "What date do you want to pay this off by?",
-                value=st.session_state.temp_payoff_date
-            )
+            st.session_state.temp_payoff_date = st.date_input("What date do you want to pay this off by?",
+                                                               value=st.session_state.temp_payoff_date)
             pay_col, cancel_col = st.columns(2)
             if pay_col.button("Submit"):
-                insert_monthly_payments_for_debt(
-                    plan_name,
-                    plan_balance,
-                    plan_due,
-                    st.session_state.temp_payoff_date
-                )
+                insert_monthly_payments_for_debt(plan_name, plan_balance, plan_due,
+                                                 st.session_state.temp_payoff_date)
                 date_str = st.session_state.temp_payoff_date.strftime("%Y-%m-%d")
                 query = f"""
                 UPDATE `{PROJECT_ID}.{DATASET_ID}.{DEBT_TABLE_NAME}`
@@ -878,23 +799,17 @@ elif page_choice == "Debt Domination":
                 WHERE rowid = '{st.session_state.active_payoff_plan}'
                 """
                 client.query(query).result()
-
                 st.session_state.active_payoff_plan = None
                 st.rerun()
             if cancel_col.button("Cancel"):
                 st.session_state.active_payoff_plan = None
                 st.rerun()
-
     st.subheader("Add a New Debt Item")
     new_debt_name = st.text_input("Debt Name (e.g. 'Loft Credit Card')", "")
     new_debt_balance = st.number_input("Current Balance", min_value=0.0, format="%.2f", value=0.0)
-    due_date_options = ["(None)"] + [
-        f"{d}st" if d==1 else f"{d}nd" if d==2 else f"{d}rd" if d==3 else f"{d}th" 
-        for d in range(1, 32)
-    ]
+    due_date_options = ["(None)"] + [f"{d}st" if d==1 else f"{d}nd" if d==2 else f"{d}rd" if d==3 else f"{d}th" for d in range(1,32)]
     new_due_date = st.selectbox("Due Date (Optional)", due_date_options, index=0)
     new_min_payment = st.text_input("Minimum Payment (Optional, blank=none)")
-
     if st.button("Add Debt"):
         if new_debt_name.strip():
             add_debt_item(new_debt_name.strip(), new_debt_balance, new_due_date, new_min_payment)
@@ -906,40 +821,32 @@ elif page_choice == "Debt Domination":
 elif page_choice == "Budget Overview":
     st.markdown("""
         <h1 style='text-align: center; font-size: 50px; font-weight: bold;
-                   color: black; text-shadow: 0px 0px 10px #00ccff,
-                                 0px 0px 20px #00ccff;'>
+                   color: black; text-shadow: 0px 0px 10px #00ccff, 0px 0px 20px #00ccff;'>
             Budget Overview
         </h1>
     """, unsafe_allow_html=True)
-
     today = datetime.today()
     first_of_this_month = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     start_date = first_of_this_month
     end_date = first_of_this_month + relativedelta(months=12) - relativedelta(days=1)
-
     fact_data = load_fact_data()
     fact_data["date"] = pd.to_datetime(fact_data["date"])
     mask = (fact_data["date"] >= start_date) & (fact_data["date"] <= end_date)
     data_12mo = fact_data[mask].copy()
-
     total_inc_12 = data_12mo[data_12mo["type"]=="income"]["amount"].sum()
     total_exp_12 = data_12mo[data_12mo["type"]=="expense"]["amount"].sum()
     leftover_12 = total_inc_12 - total_exp_12
-
     st.markdown(f"""
     <div style='display:flex; justify-content:space-around; text-align:center; padding:10px 0;'>
-        <div style='background-color:#333; padding:10px 15px; border-radius:10px;
-                    box-shadow:2px 2px 5px rgba(0,0,0,0.2);'>
+        <div style='background-color:#333; padding:10px 15px; border-radius:10px; box-shadow:2px 2px 5px rgba(0,0,0,0.2);'>
             <div style='font-size:14px; color:#bbb;'>12-Month Income</div>
             <div style='font-size:20px; font-weight:bold; color:green;'>${total_inc_12:,.2f}</div>
         </div>
-        <div style='background-color:#333; padding:10px 15px; border-radius:10px;
-                    box-shadow:2px 2px 5px rgba(0,0,0,0.2);'>
+        <div style='background-color:#333; padding:10px 15px; border-radius:10px; box-shadow:2px 2px 5px rgba(0,0,0,0.2);'>
             <div style='font-size:14px; color:#bbb;'>12-Month Expenses</div>
             <div style='font-size:20px; font-weight:bold; color:red;'>${total_exp_12:,.2f}</div>
         </div>
-        <div style='background-color:#333; padding:10px 15px; border-radius:10px;
-                    box-shadow:2px 2px 5px rgba(0,0,0,0.2);'>
+        <div style='background-color:#333; padding:10px 15px; border-radius:10px; box-shadow:2px 2px 5px rgba(0,0,0,0.2);'>
             <div style='font-size:14px; color:#bbb;'>12-Month Leftover</div>
             <div style='font-size:20px; font-weight:bold; color:{'green' if leftover_12>=0 else 'red'};'>
                 ${leftover_12:,.2f}
@@ -947,25 +854,20 @@ elif page_choice == "Budget Overview":
         </div>
     </div>
     """, unsafe_allow_html=True)
-
     data_12mo["year_month"] = data_12mo["date"].dt.to_period("M")
     monthly_sums = data_12mo.groupby(["year_month", "type"])["amount"].sum().reset_index()
     monthly_cat = data_12mo.groupby(["year_month", "type", "category"])["amount"].sum().reset_index()
-
     monthly_sums.sort_values("year_month", inplace=True)
     monthly_cat.sort_values(["year_month", "type", "category"], inplace=True)
     unique_months = monthly_sums["year_month"].drop_duplicates().sort_values()
-
     for ym in unique_months:
         y = ym.year
         m = ym.month
         m_name = calendar.month_name[m]
         display_str = f"{m_name} {y}"
-
-        inc_val = monthly_sums[(monthly_sums["year_month"] == ym) & (monthly_sums["type"] == "income")]["amount"].sum()
-        exp_val = monthly_sums[(monthly_sums["year_month"] == ym) & (monthly_sums["type"] == "expense")]["amount"].sum()
+        inc_val = monthly_sums[(monthly_sums["year_month"]==ym) & (monthly_sums["type"]=="income")]["amount"].sum()
+        exp_val = monthly_sums[(monthly_sums["year_month"]==ym) & (monthly_sums["type"]=="expense")]["amount"].sum()
         leftover_val = inc_val - exp_val
-
         st.markdown(f"""
         <div style="margin-top:20px; padding:5px; background-color:#222; border-radius:5px;">
             <h3 style="color:#66ccff; margin:5px 0;">{display_str}</h3>
@@ -984,27 +886,23 @@ elif page_choice == "Budget Overview":
             </div>
         </div>
         """, unsafe_allow_html=True)
-
-        mo_details = monthly_cat[monthly_cat["year_month"] == ym].copy()
+        mo_details = monthly_cat[monthly_cat["year_month"]==ym].copy()
         if mo_details.empty:
             st.write("No transactions for this month.")
         else:
-            inc_cats = mo_details[mo_details["type"] == "income"]
-            exp_cats = mo_details[mo_details["type"] == "expense"]
-
+            inc_cats = mo_details[mo_details["type"]=="income"]
+            exp_cats = mo_details[mo_details["type"]=="expense"]
             if not inc_cats.empty:
                 st.markdown("<b>Income Categories:</b>", unsafe_allow_html=True)
                 for _, row in inc_cats.iterrows():
                     cat_name = row["category"]
                     amt = row["amount"]
                     st.write(f" - {cat_name}: ${amt:,.2f}")
-
             if not exp_cats.empty:
                 st.markdown("<b>Expense Categories:</b>", unsafe_allow_html=True)
                 for _, row in exp_cats.iterrows():
                     cat_name = row["category"]
                     amt = row["amount"]
                     st.write(f" - {cat_name}: ${amt:,.2f}")
-
     st.markdown("<hr>", unsafe_allow_html=True)
     st.write("End of 12-month Forward Budget Overview")
