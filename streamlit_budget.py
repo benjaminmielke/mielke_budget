@@ -8,9 +8,34 @@ import calendar
 import uuid
 from dateutil.relativedelta import relativedelta
 
-# =============================================================================
-# Session State Initialization (using dictionary-style access)
-# =============================================================================
+# ─────────────────────────────────────────────────────────────────────────────
+# 0) Query Parameter Fallback Functions
+# ─────────────────────────────────────────────────────────────────────────────
+def get_query_params_fallback():
+    """
+    Safely read query params:
+    - If st.query_params exists (newer Streamlit), use it.
+    - Else fallback to st.experimental_get_query_params (older Streamlit).
+    """
+    if hasattr(st, "query_params"):
+        return st.query_params
+    else:
+        return st.experimental_get_query_params()
+
+def set_query_params_fallback(**kwargs):
+    """
+    Safely set query params:
+    - If st.set_query_params exists (newer Streamlit), use it.
+    - Else fallback to st.experimental_set_query_params (older Streamlit).
+    """
+    if hasattr(st, "set_query_params"):
+        st.set_query_params(**kwargs)
+    else:
+        st.experimental_set_query_params(**kwargs)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 1) Session State Initialization
+# ─────────────────────────────────────────────────────────────────────────────
 if "show_new_category_form" not in st.session_state:
     st.session_state["show_new_category_form"] = False
 if "show_new_item_form" not in st.session_state:
@@ -42,9 +67,9 @@ if "active_payoff_plan" not in st.session_state:
 if "temp_payoff_date" not in st.session_state:
     st.session_state["temp_payoff_date"] = datetime.today().date()
 
-# =============================================================================
-# Custom CSS for a tight mobile layout
-# =============================================================================
+# ─────────────────────────────────────────────────────────────────────────────
+# 2) Custom CSS for Mobile–Optimized Layout
+# ─────────────────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
 /* Container for each line item */
@@ -61,7 +86,7 @@ st.markdown("""
     font-family: sans-serif;
 }
 
-/* Ensure text doesn't wrap */
+/* Prevent spans from wrapping */
 .line-item-container span {
     white-space: nowrap;
 }
@@ -105,22 +130,23 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# =============================================================================
-# Google Cloud & BigQuery setup using Streamlit secrets
-# =============================================================================
+# ─────────────────────────────────────────────────────────────────────────────
+# 3) Google Cloud & BigQuery Setup using Streamlit Secrets
+# ─────────────────────────────────────────────────────────────────────────────
 bigquery_secrets = st.secrets["bigquery"]
 credentials = service_account.Credentials.from_service_account_info(bigquery_secrets)
 PROJECT_ID = bigquery_secrets["project_id"]
 DATASET_ID = "budget_data"
+
 CATS_TABLE_NAME = "dimension_budget_categories"
 FACT_TABLE_NAME = "fact_budget_inputs"
 DEBT_TABLE_NAME = "fact_debt_items"
 
 client = bigquery.Client(credentials=credentials, project=PROJECT_ID)
 
-# =============================================================================
-# Database Functions
-# =============================================================================
+# ─────────────────────────────────────────────────────────────────────────────
+# 4) Dimension Table Functions (Categories/Items)
+# ─────────────────────────────────────────────────────────────────────────────
 def load_dimension_rows(type_val):
     query = f"""
     SELECT rowid, type, category, budget_item
@@ -142,6 +168,9 @@ def add_dimension_row(type_val, category_val, budget_item_val):
         job_config=bigquery.LoadJobConfig(write_disposition="WRITE_APPEND"))
     job.result()
 
+# ─────────────────────────────────────────────────────────────────────────────
+# 5) Fact Table Functions (Budget Planning)
+# ─────────────────────────────────────────────────────────────────────────────
 def load_fact_data():
     query = f"SELECT * FROM `{PROJECT_ID}.{DATASET_ID}.{FACT_TABLE_NAME}`"
     df = client.query(query).to_dataframe()
@@ -181,6 +210,9 @@ def remove_old_payoff_lines_for_debt(debt_name):
     """
     client.query(query).result()
 
+# ─────────────────────────────────────────────────────────────────────────────
+# 6) Debt Domination Table Functions
+# ─────────────────────────────────────────────────────────────────────────────
 def load_debt_items():
     query = f"SELECT * FROM `{PROJECT_ID}.{DATASET_ID}.{DEBT_TABLE_NAME}`"
     df = client.query(query).to_dataframe()
@@ -294,9 +326,9 @@ def insert_monthly_payments_for_debt(debt_name, total_balance, debt_due_date_str
             job_config=bigquery.LoadJobConfig(write_disposition="WRITE_APPEND"))
         job.result()
 
-# =============================================================================
-# Query Parameter Processing
-# =============================================================================
+# ─────────────────────────────────────────────────────────────────────────────
+# 7) Query Parameter Processing
+# ─────────────────────────────────────────────────────────────────────────────
 params = get_query_params_fallback()
 if "recalc" in params:
     row_id = params["recalc"]
@@ -322,9 +354,9 @@ if "payoff" in params:
     set_query_params_fallback()
     st.experimental_rerun()
 
-# =============================================================================
-# CSS snippet to style the “➕” button green (unchanged)
-# =============================================================================
+# ─────────────────────────────────────────────────────────────────────────────
+# 8) CSS snippet for “➕” button styling (unchanged)
+# ─────────────────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
 button[data-baseweb="button"] div:contains("➕") {
@@ -337,15 +369,15 @@ button[data-baseweb="button"] div:contains("➕") {
 </style>
 """, unsafe_allow_html=True)
 
-# =============================================================================
-# SIDEBAR with 3 pages
-# =============================================================================
+# ─────────────────────────────────────────────────────────────────────────────
+# 9) Sidebar Navigation
+# ─────────────────────────────────────────────────────────────────────────────
 st.sidebar.title("Mielke Finances")
 page_choice = st.sidebar.radio("Navigation", ["Budget Planning", "Debt Domination", "Budget Overview"])
 
-# =============================================================================
+# ─────────────────────────────────────────────────────────────────────────────
 # Helper functions to render transaction and debt rows using inline HTML
-# =============================================================================
+# ─────────────────────────────────────────────────────────────────────────────
 def render_transaction_row(row, color_class):
     row_id = row["rowid"]
     date_str = row["date"].strftime("%Y-%m-%d")
@@ -411,23 +443,22 @@ def render_debt_transaction_edit(row):
         st.session_state["editing_debt_item"] = None
         st.experimental_rerun()
 
-# =============================================================================
+# ─────────────────────────────────────────────────────────────────────────────
 # PAGE 1: Budget Planning
-# =============================================================================
+# ─────────────────────────────────────────────────────────────────────────────
 if page_choice == "Budget Planning":
     st.markdown("""
         <h1 style='text-align: center; font-size: 50px; font-weight: bold; 
-                   color: black; text-shadow: 0px 0px 10px #00ccff, 0px 0px 20px #00ccff;'>
+                   color: black; text-shadow: 0px 0px 10px #00ccff, 
+                                 0px 0px 20px #00ccff;'>
             Mielke Budget
         </h1>
     """, unsafe_allow_html=True)
 
-    # Display Month Title
+    # Display Month Title and Navigation Buttons in one horizontal block
     current_month = st.session_state["current_month"]
     current_year = st.session_state["current_year"]
     st.markdown(f"<div style='text-align: center; font-size: 24px; font-weight: bold; padding: 10px;'>{calendar.month_name[current_month]} {current_year}</div>", unsafe_allow_html=True)
-
-    # Month navigation buttons in one row
     col_prev, col_next = st.columns(2)
     with col_prev:
         if st.button("Previous Month"):
@@ -474,7 +505,7 @@ if page_choice == "Budget Planning":
     </div>
     """, unsafe_allow_html=True)
 
-    # Build a day-grid calendar for the month
+    # Build a day-grid calendar for the selected month
     days_in_month = calendar.monthrange(current_year, current_month)[1]
     first_weekday = (calendar.monthrange(current_year, current_month)[0] + 1) % 7
     calendar_grid = [["" for _ in range(7)] for _ in range(6)]
@@ -840,7 +871,7 @@ elif page_choice == "Debt Domination":
 
     if st.session_state["active_payoff_plan"] is not None:
         reloaded_df = load_debt_items()
-        match = reloaded_df[reloaded_df["rowid"] == st.session_state["active_payoff_plan"]]
+        match = reloaded_df[reloaded_df["rowid"]==st.session_state["active_payoff_plan"]]
         if not match.empty:
             plan_data = match.iloc[0]
             plan_name = plan_data["debt_name"]
