@@ -96,29 +96,24 @@ def set_query_params_fallback(**kwargs):
 # =============================================================================
 # Session State Initialization
 # =============================================================================
-# For Budget Planning editing
 if "editing_budget_item" not in st.session_state:
     st.session_state.editing_budget_item = None
 if "temp_budget_edit_date" not in st.session_state:
     st.session_state.temp_budget_edit_date = datetime.today()
 if "temp_budget_edit_amount" not in st.session_state:
     st.session_state.temp_budget_edit_amount = 0.0
-# For Debt Domination editing
 if "editing_debt_item" not in st.session_state:
     st.session_state.editing_debt_item = None
 if "temp_new_balance" not in st.session_state:
     st.session_state.temp_new_balance = 0.0
-# For month navigation in Budget Planning
 if "current_month" not in st.session_state:
     st.session_state.current_month = datetime.today().month
 if "current_year" not in st.session_state:
     st.session_state.current_year = datetime.today().year
-# For Payoff Plan in Debt Domination
 if "active_payoff_plan" not in st.session_state:
     st.session_state.active_payoff_plan = None
 if "temp_payoff_date" not in st.session_state:
     st.session_state.temp_payoff_date = datetime.today().date()
-# For Dimension table (Category/Budget Item) management
 if "show_new_category_form" not in st.session_state:
     st.session_state.show_new_category_form = False
 if "show_new_item_form" not in st.session_state:
@@ -196,7 +191,7 @@ def update_debt_item(row_id, new_balance):
     client.query(query).result()
 
 def insert_monthly_payments_for_debt(debt_name, total_balance, debt_due_date_str, payoff_date):
-    # Remove existing auto-payoff rows first
+    # Remove existing auto-payoff rows
     escaped_name = debt_name.replace("'", "''")
     query = f"""
     DELETE FROM `{PROJECT_ID}.{DATASET_ID}.{FACT_TABLE_NAME}`
@@ -257,7 +252,6 @@ def insert_monthly_payments_for_debt(debt_name, total_balance, debt_due_date_str
         job.result()
 
 def load_dimension_rows(type_val):
-    # Load the dimension table rows for a given type (income/expense)
     query = f"""
     SELECT rowid, type, category, budget_item
     FROM `{PROJECT_ID}.{DATASET_ID}.{CATS_TABLE_NAME}`
@@ -282,7 +276,7 @@ def add_dimension_row(type_val, category_val, budget_item_val):
 # Custom Row Rendering Functions for Budget Planning
 # =============================================================================
 def render_budget_row_html(row, color_class):
-    """Render a budget transaction row (non-edit mode) as a custom HTML bar."""
+    """Render a budget row (non-edit mode) as a custom HTML bar with inline buttons."""
     row_id = row["rowid"]
     date_str = row["date"].strftime("%Y-%m-%d")
     item_str = row["budget_item"]
@@ -293,17 +287,17 @@ def render_budget_row_html(row, color_class):
       <div style="flex:1; margin-left:15px; color:#fff;">{item_str}</div>
       <div style="min-width:80px; margin-left:15px; color:{color_class};">{amount_str}</div>
       <div>
-         <a class="row-button" href="?action=edit&rowid={row_id}">Edit</a>
+         <a class="row-button" href="?action=edit&rowid={row_id}" target="_self">Edit</a>
       </div>
       <div>
-         <a class="row-button remove" href="?action=remove&rowid={row_id}">❌</a>
+         <a class="row-button remove" href="?action=remove&rowid={row_id}" target="_self">❌</a>
       </div>
     </div>
     """
     st.markdown(html, unsafe_allow_html=True)
 
 def render_budget_row_edit(row, color_class):
-    """Render the editing interface for a budget transaction row."""
+    """Render the editing interface for a budget row using native Streamlit inputs."""
     row_id = row["rowid"]
     item_str = row["budget_item"]
     amount_str = f"${row['amount']:,.2f}"
@@ -333,7 +327,7 @@ def render_budget_row_edit(row, color_class):
 # Custom Row Rendering Functions for Debt Domination
 # =============================================================================
 def render_debt_row_html(row):
-    """Render a debt row (non-edit mode) as a custom HTML bar with Payoff/Recalc links."""
+    """Render a debt row (non-edit mode) as a custom HTML bar with inline buttons."""
     row_id = row["rowid"]
     row_name = row["debt_name"]
     row_balance = row["current_balance"]
@@ -346,20 +340,20 @@ def render_debt_row_html(row):
       <div style="flex:1; margin-left:15px; color:#fff;">Due: {row_due}, Min: {row_min}</div>
       <div style="min-width:80px; margin-left:15px; color:red;">${row_balance:,.2f}</div>
       <div>
-         <a class="row-button" href="?action=edit_debt&rowid={row_id}">Edit</a>
+         <a class="row-button" href="?action=edit_debt&rowid={row_id}" target="_self">Edit</a>
       </div>
       <div>
-         <a class="row-button" href="?action=payoff&rowid={row_id}">{payoff_text}</a>
+         <a class="row-button" href="?action=payoff&rowid={row_id}" target="_self">{payoff_text}</a>
       </div>
       <div>
-         <a class="row-button remove" href="?action=remove_debt&rowid={row_id}">❌</a>
+         <a class="row-button remove" href="?action=remove_debt&rowid={row_id}" target="_self">❌</a>
       </div>
     </div>
     """
     st.markdown(html, unsafe_allow_html=True)
 
 def render_debt_row_edit(row):
-    """Render the editing interface for a debt row."""
+    """Render the editing interface for a debt row using native Streamlit inputs."""
     row_id = row["rowid"]
     row_name = row["debt_name"]
     row_balance = row["current_balance"]
@@ -506,13 +500,13 @@ if page_choice == "Budget Planning":
     st.markdown(f'<div class="calendar-container">{calendar_html}</div>', unsafe_allow_html=True)
     
     # =============================================================================
-    # Add New Income/Expense Form (with drop-downs for Category and Budget Item)
+    # Add New Income/Expense Form with Drop-Downs for Category & Budget Item
     # =============================================================================
     st.markdown("<div class='section-subheader'>Add New Income/Expense</div>", unsafe_allow_html=True)
     date_input = st.date_input("Date", value=datetime.today(), label_visibility="collapsed")
     type_input = st.selectbox("Type", ["income", "expense"], label_visibility="collapsed")
     
-    # Load dimension table for this type
+    # Load dimension rows for selected type
     dimension_df = load_dimension_rows(type_input)
     all_categories = sorted(dimension_df["category"].unique())
     if not all_categories:
@@ -530,7 +524,7 @@ if page_choice == "Budget Planning":
             st.experimental_rerun()
         if col_cat2.button("Cancel", key="cancel_category"):
             st.session_state.show_new_category_form = False
-
+    
     items_for_cat = dimension_df[dimension_df["category"] == selected_category]["budget_item"].unique()
     items_for_cat = [i for i in items_for_cat if i != ""]
     if not items_for_cat:
@@ -548,7 +542,7 @@ if page_choice == "Budget Planning":
             st.experimental_rerun()
         if col_item2.button("Cancel", key="cancel_item"):
             st.session_state.show_new_item_form = False
-
+    
     amount_input = st.number_input("Amount", min_value=0.0, format="%.2f", label_visibility="collapsed")
     note_input = st.text_area("Note", label_visibility="collapsed")
     if st.button("Add Transaction"):
@@ -595,7 +589,7 @@ elif page_choice == "Debt Domination":
                 render_debt_row_edit(row)
             else:
                 render_debt_row_html(row)
-    # Add New Debt Item Form
+    
     st.markdown("<div class='section-subheader'>Add New Debt Item</div>", unsafe_allow_html=True)
     new_debt_name = st.text_input("Debt Name (e.g. 'Loft Credit Card')")
     new_debt_balance = st.number_input("Current Balance", min_value=0.0, format="%.2f")
@@ -604,12 +598,11 @@ elif page_choice == "Debt Domination":
     new_min_payment = st.text_input("Minimum Payment (Optional)")
     if st.button("Add Debt"):
         if new_debt_name.strip():
-            # Here you would call your add_debt_item function
-            # For demonstration, we simply show a success message.
+            # Call your add_debt_item function here.
+            # For this example, we'll display a success message.
             st.success("New debt item added (functionality assumed).")
             st.rerun()
     
-    # Payoff Plan Form
     if st.session_state.active_payoff_plan is not None:
         reloaded_debts = load_debt_items()
         match = reloaded_debts[reloaded_debts["rowid"] == st.session_state.active_payoff_plan]
@@ -670,5 +663,4 @@ elif page_choice == "Budget Overview":
         </div>
     </div>
     """, unsafe_allow_html=True)
-    # (Additional breakdowns and charts can be appended here.)
-
+    # Additional charts or breakdowns can be added here.
