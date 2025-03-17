@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from google.cloud import bigquery
+from google.oauth2 import service_account
 from datetime import datetime, date
 import os
 import calendar
@@ -65,19 +66,19 @@ if "temp_payoff_date" not in st.session_state:
     st.session_state.temp_payoff_date = datetime.today().date()
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 3) Google Cloud & BigQuery setup
+# 3) Google Cloud & BigQuery setup using Streamlit secrets
 # ─────────────────────────────────────────────────────────────────────────────
-SERVICE_ACCOUNT_FILE = r"/Users/benjamin.mielke/Documents/Budget App/budget-451105-3364a9d00d0f.json"
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = SERVICE_ACCOUNT_FILE
-
-PROJECT_ID = "budget-451105"
+# Load credentials from the Streamlit secrets under the [bigquery] key.
+bigquery_secrets = st.secrets["bigquery"]
+credentials = service_account.Credentials.from_service_account_info(bigquery_secrets)
+PROJECT_ID = bigquery_secrets["project_id"]
 DATASET_ID = "budget_data"
 
 CATS_TABLE_NAME = "dimension_budget_categories"
 FACT_TABLE_NAME = "fact_budget_inputs"
 DEBT_TABLE_NAME = "fact_debt_items"
 
-client = bigquery.Client()
+client = bigquery.Client(credentials=credentials, project=PROJECT_ID)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 4) Dimension table (categories/items)
