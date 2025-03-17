@@ -1,1 +1,6 @@
-streamlitpandasgoogle-cloud-bigquerypython-dateutil
+streamlit
+pandas
+google-cloud-bigquery
+python-dateutil
+db-dtypes
+
