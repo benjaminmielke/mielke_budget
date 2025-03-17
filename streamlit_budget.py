@@ -250,7 +250,6 @@ def insert_monthly_payments_for_debt(debt_name, total_balance, debt_due_date_str
         dt_candidate = date(y, m, actual_day)
         if dt_candidate >= today_dt:
             months_list.append(dt_candidate)
-
         m += 1
         if m > 12:
             m = 1
@@ -264,9 +263,9 @@ def insert_monthly_payments_for_debt(debt_name, total_balance, debt_due_date_str
     table_id = f"{PROJECT_ID}.{DATASET_ID}.{FACT_TABLE_NAME}"
     rows_to_insert = []
     for d in months_list:
-        row_id = str(uuid.uuid4())
+        new_row_id = str(uuid.uuid4())
         rows_to_insert.append({
-            "rowid": row_id,
+            "rowid": new_row_id,
             "date": d,
             "type": "expense",
             "amount": monthly_amount,
@@ -349,18 +348,31 @@ if page_choice == "Budget Planning":
         </h1>
     """, unsafe_allow_html=True)
 
-    # Initialize month/year
-    if "current_month" not in st.session_state:
-        st.session_state.current_month = datetime.today().month
-    if "current_year" not in st.session_state:
-        st.session_state.current_year = datetime.today().year
-
+    # Display Month Title
     current_month = st.session_state.current_month
     current_year = st.session_state.current_year
+    st.markdown(f"<div style='text-align: center; font-size: 24px; font-weight: bold; padding: 10px;'>{calendar.month_name[current_month]} {current_year}</div>", unsafe_allow_html=True)
+    # Month navigation buttons in one horizontal row below the title
+    col_prev, col_next = st.columns(2)
+    with col_prev:
+        if st.button("Previous Month"):
+            if st.session_state.current_month == 1:
+                st.session_state.current_month = 12
+                st.session_state.current_year -= 1
+            else:
+                st.session_state.current_month -= 1
+            st.experimental_rerun()
+    with col_next:
+        if st.button("Next Month"):
+            if st.session_state.current_month == 12:
+                st.session_state.current_month = 1
+                st.session_state.current_year += 1
+            else:
+                st.session_state.current_month += 1
+            st.experimental_rerun()
 
     fact_data = load_fact_data()
     fact_data.sort_values("date", ascending=True, inplace=True)
-
     filtered_data = fact_data[
         (fact_data["date"].dt.month == current_month) &
         (fact_data["date"].dt.year == current_year)
@@ -370,131 +382,44 @@ if page_choice == "Budget Planning":
     total_expenses = filtered_data[filtered_data["type"]=="expense"]["amount"].sum()
     leftover = total_income - total_expenses
 
-    # Basic CSS
-    st.markdown("""
-    <style>
-    table {
-        border-collapse: collapse;
-        width: 100%;
-        table-layout: fixed;
-        border: 2px solid #444;
-        background-color: #222;
-        color: #ddd;
-    }
-    th {
-        font-weight: bold;
-        text-align: center;
-        padding: 15px;
-        background-color: #333;
-        color: white;
-        border: 2px solid #444;
-    }
-    td {
-        border: 2px solid #444;
-        padding: 15px;
-        text-align: left;
-        vertical-align: top;
-        word-wrap: break-word;
-        height: 100px;
-        background-color: #111;
-        color: #ddd;
-    }
-    td span {
-        display: block;
-        font-size: 0.9em;
-    }
-    .section-subheader {
-        font-size: 28px;
-        font-weight: bold;
-        color: #66ccff;
-        margin-top: 30px;
-        margin-bottom: 15px;
-        text-shadow: 0px 0px 3px #00ccff;
-    }
-    .category-header {
-        font-size: 20px;
-        font-weight: bold;
-        margin-top: 20px;
-        margin-bottom: 10px;
-        color: #66ccff;
-    }
-    button[data-baseweb="button"] div:contains("❌") {
-        color: red !important;
-        font-weight: bold !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-    # Display top metrics
     st.markdown(f"""
-    <div style='display: flex; justify-content: space-around; text-align: center; padding: 10px 0;'>
-        <div style='background-color: #333; padding: 10px 15px; border-radius: 10px; 
-                    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2);'>
-            <div style='font-size: 14px; color: #bbb;'>Total Income</div>
-            <div style='font-size: 20px; font-weight: bold; color: green;'>${total_income:,.2f}</div>
+    <div style='display: flex; justify-content: center; gap: 8px; padding: 10px 0;'>
+        <div class='metric-box'>
+            <div>Total Income</div>
+            <div style='color:green;'>{total_income:,.2f}</div>
         </div>
-        <div style='background-color: #333; padding: 10px 15px; border-radius: 10px; 
-                    box-shadow: 2px 2px 5px rgba(0,0,0,0.2);'>
-            <div style='font-size: 14px; color: #bbb;'>Total Expenses</div>
-            <div style='font-size: 20px; font-weight: bold; color: red;'>${total_expenses:,.2f}</div>
+        <div class='metric-box'>
+            <div>Total Expenses</div>
+            <div style='color:red;'>{total_expenses:,.2f}</div>
         </div>
-        <div style='background-color: #333; padding: 10px 15px; border-radius: 10px; 
-                    box-shadow: 2px 2px 5px rgba(0,0,0,0.2);'>
-            <div style='font-size: 14px; color: #bbb;'>Leftover</div>
-            <div style='font-size: 20px; font-weight: bold; color: {'green' if leftover>=0 else 'red'};'>${leftover:,.2f}</div>
+        <div class='metric-box'>
+            <div>Leftover</div>
+            <div style='color:{"green" if leftover>=0 else "red"};'>{leftover:,.2f}</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-    # Month navigation
-    nav_col1, nav_col2, nav_col3, nav_col4 = st.columns([0.25, 1, 2, 1])
-    with nav_col2:
-        if st.button("Previous Month"):
-            if st.session_state.current_month == 1:
-                st.session_state.current_month = 12
-                st.session_state.current_year -= 1
-            else:
-                st.session_state.current_month -= 1
-            st.rerun()
-
-    with nav_col3:
-        st.markdown(f"""
-        <div style='text-align: center; font-size: 24px; font-weight: bold; padding: 10px;'>
-            {calendar.month_name[current_month]} {current_year}
-        </div>
-        """, unsafe_allow_html=True)
-
-    with nav_col4:
-        if st.button("Next Month"):
-            if st.session_state.current_month == 12:
-                st.session_state.current_month = 1
-                st.session_state.current_year += 1
-            else:
-                st.session_state.current_month += 1
-            st.rerun()
-
     # Build a day-grid calendar for the selected month
     days_in_month = calendar.monthrange(current_year, current_month)[1]
-    first_weekday = (calendar.monthrange(current_year, current_month)[0]+1)%7
+    first_weekday = (calendar.monthrange(current_year, current_month)[0] + 1) % 7
     calendar_grid = [["" for _ in range(7)] for _ in range(6)]
     day_counter = 1
-
     for week in range(6):
         for weekday in range(7):
-            if week==0 and weekday<first_weekday:
+            if week == 0 and weekday < first_weekday:
                 continue
-            if day_counter>days_in_month:
+            if day_counter > days_in_month:
                 break
             cell_html = f"<strong>{day_counter}</strong>"
             day_tx = filtered_data[filtered_data["date"].dt.day == day_counter]
             for _, row in day_tx.iterrows():
                 color = "red" if row["type"]=="expense" else "green"
-                cell_html += f"<br><span style='color:{color};'>${row['amount']:,.2f} ({row['budget_item']})</span>"
+                cell_html += f"<br><span style='color:{color};'>{row['amount']:,.2f} ({row['budget_item']})</span>"
             calendar_grid[week][weekday] = cell_html
-            day_counter+=1
+            day_counter += 1
 
     cal_df = pd.DataFrame(calendar_grid, columns=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"])
-    st.write(cal_df.to_html(index=False, escape=False), unsafe_allow_html=True)
+    st.markdown(f'<div class="calendar-container">{cal_df.to_html(index=False, escape=False)}</div>', unsafe_allow_html=True)
 
     st.markdown("<div class='section-subheader'>Add New Income/Expense</div>", unsafe_allow_html=True)
 
@@ -537,7 +462,7 @@ if page_choice == "Budget Planning":
                 add_dimension_row(type_input, new_cat, "")
             st.session_state.show_new_category_form = False
             st.session_state.temp_new_category = ""
-            st.rerun()
+            st.experimental_rerun()
         if cc2.button("Cancel"):
             st.session_state.show_new_category_form = False
             st.session_state.temp_new_category = ""
@@ -568,7 +493,7 @@ if page_choice == "Budget Planning":
                 add_dimension_row(type_input, category_input, new_item)
             st.session_state.show_new_item_form = False
             st.session_state.temp_new_item = ""
-            st.rerun()
+            st.experimental_rerun()
         if ic2.button("Cancel"):
             st.session_state.show_new_item_form = False
             st.session_state.temp_new_item = ""
@@ -600,7 +525,7 @@ if page_choice == "Budget Planning":
                 "note": note_input
             }])
             save_fact_data(tx_df)
-            st.rerun()
+            st.experimental_rerun()
 
     st.markdown("<div class='section-subheader'>Transactions This Month</div>", unsafe_allow_html=True)
 
@@ -611,29 +536,28 @@ if page_choice == "Budget Planning":
         exp_data = filtered_data[filtered_data["type"]=="expense"]
 
         def render_budget_row(row, color_class):
-            row_id=row["rowid"]
-            date_str=row["date"].strftime("%Y-%m-%d")
-            item_str=row["budget_item"]
-            amount_str=f"${row['amount']:,.2f}"
-            is_editing=(st.session_state.editing_budget_item==row_id)
+            row_id = row["rowid"]
+            date_str = row["date"].strftime("%Y-%m-%d")
+            item_str = row["budget_item"]
+            amount_str = f"${row['amount']:,.2f}"
+            is_editing = (st.session_state.editing_budget_item == row_id)
 
-            main_bar_col, btns_col = st.columns([0.75,0.25])
+            main_bar_col, btns_col = st.columns([0.75, 0.25])
 
             if is_editing:
-                # Edit mode
                 with main_bar_col:
                     st.markdown(f"""
                     <div style="display:flex;align-items:center;background-color:#333;
-                                padding:10px;border-radius:5px;margin-bottom:8px;
+                                padding:8px;border-radius:5px;margin-bottom:4px;
                                 justify-content:space-between;">
-                        <div style="font-size:16px;font-weight:bold;color:#fff; min-width:100px;">
+                        <div style="font-size:14px;font-weight:bold;color:#fff; min-width:80px;">
                             Editing...
                         </div>
-                        <div style="flex:1;margin-left:15px;color:#fff;font-size:16px;">
+                        <div style="flex:1;margin-left:8px;color:#fff;font-size:14px;">
                             {item_str}
                         </div>
-                        <div style="font-size:16px;font-weight:bold;text-align:right;
-                                    min-width:80px;margin-left:15px;color:{color_class};">
+                        <div style="font-size:14px;font-weight:bold;text-align:right;
+                                    min-width:60px;margin-left:8px;color:{color_class};">
                             {amount_str}
                         </div>
                     </div>
@@ -642,44 +566,43 @@ if page_choice == "Budget Planning":
                     st.session_state.temp_budget_edit_date = st.date_input(
                         "Date", value=row["date"], key=f"edit_date_{row_id}"
                     )
-                    st.session_state.temp_budget_edit_amount=st.number_input(
+                    st.session_state.temp_budget_edit_amount = st.number_input(
                         "Amount", min_value=0.0, format="%.2f", 
                         value=float(row["amount"]), key=f"edit_amount_{row_id}"
                     )
 
-                    sc1, sc2=st.columns(2)
+                    sc1, sc2 = st.columns(2)
                     if sc1.button("Save", key=f"save_{row_id}"):
                         update_fact_row(
                             row_id, 
                             st.session_state.temp_budget_edit_date,
                             st.session_state.temp_budget_edit_amount
                         )
-                        st.session_state.editing_budget_item=None
-                        st.rerun()
+                        st.session_state.editing_budget_item = None
+                        st.experimental_rerun()
                     if sc2.button("Cancel", key=f"cancel_{row_id}"):
-                        st.session_state.editing_budget_item=None
-                        st.rerun()
+                        st.session_state.editing_budget_item = None
+                        st.experimental_rerun()
 
                 with btns_col:
                     if st.button("❌", key=f"remove_{row_id}"):
                         remove_fact_row(row_id)
-                        st.rerun()
+                        st.experimental_rerun()
 
             else:
-                # Normal mode
                 with main_bar_col:
                     st.markdown(f"""
                     <div style="display:flex;align-items:center;background-color:#333;
-                                padding:10px;border-radius:5px;margin-bottom:8px;
+                                padding:8px;border-radius:5px;margin-bottom:4px;
                                 justify-content:space-between;">
-                        <div style="font-size:16px;font-weight:bold;color:#fff; min-width:100px;">
+                        <div style="font-size:14px;font-weight:bold;color:#fff; min-width:80px;">
                             {date_str}
                         </div>
-                        <div style="flex:1;margin-left:15px;color:#fff;font-size:16px;">
+                        <div style="flex:1;margin-left:8px;color:#fff;font-size:14px;">
                             {item_str}
                         </div>
-                        <div style="font-size:16px;font-weight:bold;text-align:right;
-                                    min-width:80px;margin-left:15px;color:{color_class};">
+                        <div style="font-size:14px;font-weight:bold;text-align:right;
+                                    min-width:60px;margin-left:8px;color:{color_class};">
                             {amount_str}
                         </div>
                     </div>
@@ -688,26 +611,23 @@ if page_choice == "Budget Planning":
                 with btns_col:
                     e_col, x_col = st.columns(2)
                     if e_col.button("Edit", key=f"editbtn_{row_id}"):
-                        st.session_state.editing_budget_item=row_id
-                        st.rerun()
+                        st.session_state.editing_budget_item = row_id
+                        st.experimental_rerun()
                     if x_col.button("❌", key=f"removebtn_{row_id}"):
                         remove_fact_row(row_id)
-                        st.rerun()
+                        st.experimental_rerun()
 
-        # Show incomes first
         if not inc_data.empty:
             for cat_name, group_df in inc_data.groupby("category"):
                 st.markdown(f"<div class='category-header'>{cat_name}</div>", unsafe_allow_html=True)
                 for _, row in group_df.iterrows():
                     render_budget_row(row, "#00cc00")
 
-        # Show expenses
         if not exp_data.empty:
             for cat_name, group_df in exp_data.groupby("category"):
                 st.markdown(f"<div class='category-header'>{cat_name}</div>", unsafe_allow_html=True)
                 for _, row in group_df.iterrows():
                     render_budget_row(row, "#ff4444")
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # PAGE 2: Debt Domination
@@ -724,9 +644,8 @@ elif page_choice == "Debt Domination":
     debt_df = load_debt_items()
     total_debt = debt_df["current_balance"].sum() if not debt_df.empty else 0.0
 
-    # Show total debt
     st.markdown(f"""
-    <div style='display: flex; justify-content: space-around; text-align: center; padding:10px 0;'>
+    <div style='display: flex; justify-content: center; text-align: center; padding:10px 0;'>
         <div style='background-color:#333; padding:10px 15px; border-radius:10px;
                     box-shadow:2px 2px 5px rgba(0,0,0,0.2);'>
             <div style='font-size:14px; color:#bbb;'>Total Debt</div>
@@ -750,26 +669,24 @@ elif page_choice == "Debt Domination":
 
             is_editing = (st.session_state.editing_debt_item==row_id)
 
-            # longer bar => [0.70, 0.30]
-            main_bar_col, btns_col = st.columns([0.70,0.30])
+            main_bar_col, btns_col = st.columns([0.70, 0.30])
 
             if is_editing:
-                # Edit mode => update balance
                 with main_bar_col:
                     st.markdown(f"""
                     <div style="display:flex;align-items:center;background-color:#333;
-                                padding:10px; border-radius:5px; margin-bottom:8px;
+                                padding:8px;border-radius:5px;margin-bottom:4px;
                                 justify-content:space-between;">
-                        <div style="font-size:16px; font-weight:bold; color:#fff; min-width:60px;">
+                        <div style="font-size:14px; font-weight:bold; color:#fff; min-width:60px;">
                             {row_name}
                         </div>
-                        <div style="flex:1; margin-left:15px; color:#fff; font-size:16px;">
+                        <div style="flex:1; margin-left:8px; color:#fff; font-size:14px;">
                             Due: {row_due}, Min: {row_min if row_min else "(None)"}
                         </div>
                     </div>
                     """, unsafe_allow_html=True)
 
-                    st.session_state.temp_new_balance=st.number_input(
+                    st.session_state.temp_new_balance = st.number_input(
                         "New Balance",
                         min_value=0.0,
                         format="%.2f",
@@ -780,32 +697,31 @@ elif page_choice == "Debt Domination":
                     if s_col.button("Save", key=f"save_debt_{row_id}"):
                         update_debt_item(row_id, st.session_state.temp_new_balance)
                         st.session_state.editing_debt_item=None
-                        st.rerun()
+                        st.experimental_rerun()
                     if c_col.button("Cancel", key=f"cancel_debt_{row_id}"):
                         st.session_state.editing_debt_item=None
-                        st.rerun()
+                        st.experimental_rerun()
 
                 with btns_col:
-                    remove_clicked = st.button("❌", key=f"remove_debt_{row_id}")
-                    if remove_clicked:
+                    if st.button("❌", key=f"remove_debt_{row_id}"):
                         remove_debt_item(row_id)
                         remove_old_payoff_lines_for_debt(row_name)
-                        st.rerun()
+                        st.experimental_rerun()
+
             else:
-                # Normal row
                 with main_bar_col:
                     st.markdown(f"""
                     <div style="display:flex;align-items:center;background-color:#333;
-                                padding:10px; border-radius:5px; margin-bottom:8px;
+                                padding:8px;border-radius:5px;margin-bottom:4px;
                                 justify-content:space-between;">
-                        <div style="font-size:16px; font-weight:bold; color:#fff; min-width:60px;">
+                        <div style="font-size:14px; font-weight:bold; color:#fff; min-width:60px;">
                             {row_name}
                         </div>
-                        <div style="flex:1; margin-left:15px; color:#fff; font-size:16px;">
+                        <div style="flex:1; margin-left:8px; color:#fff; font-size:14px;">
                             Due: {row_due}, Min: {row_min if row_min else "(None)"}
                         </div>
-                        <div style="font-size:16px; font-weight:bold; text-align:right;
-                                    min-width:60px; margin-left:15px; color:red;">
+                        <div style="font-size:14px; font-weight:bold; text-align:right;
+                                    min-width:60px; margin-left:8px; color:red;">
                             ${row_balance:,.2f}
                         </div>
                     </div>
@@ -817,12 +733,11 @@ elif page_choice == "Debt Domination":
                     remove_clicked = x_col.button("❌", key=f"remove_btn_{row_id}")
 
                     if plan_date:
-                        # If payoff plan date exists => green Recalc
                         payoff_html = f"""
                         <div style="text-align:center;">
                             <a href="?recalc={row_id}" 
                                style="display:inline-block; background-color:green; color:white; 
-                                      font-weight:bold; border-radius:5px; padding:6px 10px; 
+                                      font-weight:bold; border-radius:5px; padding:4px 8px; 
                                       text-decoration:none;">
                                 Recalc
                             </a>
@@ -830,12 +745,11 @@ elif page_choice == "Debt Domination":
                         """
                         payoff_col.markdown(payoff_html, unsafe_allow_html=True)
                     else:
-                        # No plan => yellow Payoff
                         payoff_html = f"""
                         <div style="text-align:center;">
                             <a href="?payoff={row_id}" 
                                style="display:inline-block; background-color:yellow; color:black; 
-                                      font-weight:bold; border-radius:5px; padding:6px 10px; 
+                                      font-weight:bold; border-radius:5px; padding:4px 8px; 
                                       text-decoration:none;">
                                 Payoff
                             </a>
@@ -844,14 +758,13 @@ elif page_choice == "Debt Domination":
                         payoff_col.markdown(payoff_html, unsafe_allow_html=True)
 
                     if edit_clicked:
-                        st.session_state.editing_debt_item=row_id
-                        st.rerun()
+                        st.session_state.editing_debt_item = row_id
+                        st.experimental_rerun()
                     if remove_clicked:
                         remove_debt_item(row_id)
                         remove_old_payoff_lines_for_debt(row_name)
-                        st.rerun()
+                        st.experimental_rerun()
 
-    # If user triggered “Payoff Plan”
     if st.session_state.active_payoff_plan is not None:
         reloaded_df = load_debt_items()
         match = reloaded_df[reloaded_df["rowid"]==st.session_state.active_payoff_plan]
@@ -883,11 +796,11 @@ elif page_choice == "Debt Domination":
                 """
                 client.query(query).result()
 
-                st.session_state.active_payoff_plan=None
-                st.rerun()
+                st.session_state.active_payoff_plan = None
+                st.experimental_rerun()
             if cancel_col.button("Cancel"):
-                st.session_state.active_payoff_plan=None
-                st.rerun()
+                st.session_state.active_payoff_plan = None
+                st.experimental_rerun()
 
     st.subheader("Add a New Debt Item")
     new_debt_name = st.text_input("Debt Name (e.g. 'Loft Credit Card')","")
@@ -898,11 +811,10 @@ elif page_choice == "Debt Domination":
     ]
     new_due_date = st.selectbox("Due Date (Optional)", due_date_options, index=0)
     new_min_payment = st.text_input("Minimum Payment (Optional, blank=none)")
-
     if st.button("Add Debt"):
         if new_debt_name.strip():
             add_debt_item(new_debt_name.strip(), new_debt_balance, new_due_date, new_min_payment)
-        st.rerun()
+        st.experimental_rerun()
 
 # ─────────────────────────────────────────────────────────────────────────────
 # PAGE 3: Budget Overview (Forward 12 months)
@@ -916,7 +828,6 @@ elif page_choice == "Budget Overview":
         </h1>
     """, unsafe_allow_html=True)
 
-    # We'll define the forward 12 months from current month
     today = datetime.today()
     first_of_this_month = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     start_date = first_of_this_month
@@ -927,29 +838,23 @@ elif page_choice == "Budget Overview":
     mask = (fact_data["date"]>=start_date) & (fact_data["date"]<=end_date)
     data_12mo = fact_data[mask].copy()
 
-    # total inc/exp leftover
     total_inc_12 = data_12mo[data_12mo["type"]=="income"]["amount"].sum()
     total_exp_12 = data_12mo[data_12mo["type"]=="expense"]["amount"].sum()
     leftover_12 = total_inc_12 - total_exp_12
 
     st.markdown(f"""
-    <div style='display:flex; justify-content:space-around; text-align:center; padding:10px 0;'>
-        <div style='background-color:#333; padding:10px 15px; border-radius:10px;
-                    box-shadow:2px 2px 5px rgba(0,0,0,0.2);'>
-            <div style='font-size:14px; color:#bbb;'>12-Month Income</div>
-            <div style='font-size:20px; font-weight:bold; color:green;'>${total_inc_12:,.2f}</div>
+    <div style='display: flex; justify-content: center; gap: 8px; padding: 10px 0;'>
+        <div class="metric-box">
+            <div>12-Month Income</div>
+            <div style='color:green;'>{total_inc_12:,.2f}</div>
         </div>
-        <div style='background-color:#333; padding:10px 15px; border-radius:10px;
-                    box-shadow:2px 2px 5px rgba(0,0,0,0.2);'>
-            <div style='font-size:14px; color:#bbb;'>12-Month Expenses</div>
-            <div style='font-size:20px; font-weight:bold; color:red;'>${total_exp_12:,.2f}</div>
+        <div class="metric-box">
+            <div>12-Month Expenses</div>
+            <div style='color:red;'>{total_exp_12:,.2f}</div>
         </div>
-        <div style='background-color:#333; padding:10px 15px; border-radius:10px;
-                    box-shadow:2px 2px 5px rgba(0,0,0,0.2);'>
-            <div style='font-size:14px; color:#bbb;'>12-Month Leftover</div>
-            <div style='font-size:20px; font-weight:bold; color:{'green' if leftover_12>=0 else 'red'};'>
-                ${leftover_12:,.2f}
-            </div>
+        <div class="metric-box">
+            <div>Leftover</div>
+            <div style='color:{"green" if leftover_12>=0 else "red"};'>{leftover_12:,.2f}</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -968,15 +873,14 @@ elif page_choice == "Budget Overview":
         m_name = calendar.month_name[m]
         display_str = f"{m_name} {y}"
 
-        inc_val=monthly_sums[(monthly_sums["year_month"]==ym)&(monthly_sums["type"]=="income")]["amount"].sum()
-        exp_val=monthly_sums[(monthly_sums["year_month"]==ym)&(monthly_sums["type"]=="expense")]["amount"].sum()
+        inc_val = monthly_sums[(monthly_sums["year_month"]==ym) & (monthly_sums["type"]=="income")]["amount"].sum()
+        exp_val = monthly_sums[(monthly_sums["year_month"]==ym) & (monthly_sums["type"]=="expense")]["amount"].sum()
         leftover_val = inc_val - exp_val
 
-        # Show monthly summary
         st.markdown(f"""
         <div style="margin-top:20px; padding:5px; background-color:#222; border-radius:5px;">
             <h3 style="color:#66ccff; margin:5px 0;">{display_str}</h3>
-            <div style="display:flex; justify-content: space-around; text-align:center;">
+            <div style="display:flex; justify-content: center; gap: 8px;">
                 <div>
                     <span style="color:green; font-weight:bold;">Income:</span> ${inc_val:,.2f}
                 </div>
@@ -992,7 +896,6 @@ elif page_choice == "Budget Overview":
         </div>
         """, unsafe_allow_html=True)
 
-        # Category breakdown
         mo_details = monthly_cat[monthly_cat["year_month"]==ym].copy()
         if mo_details.empty:
             st.write("No transactions for this month.")
@@ -1003,15 +906,15 @@ elif page_choice == "Budget Overview":
             if not inc_cats.empty:
                 st.markdown("<b>Income Categories:</b>", unsafe_allow_html=True)
                 for _, row in inc_cats.iterrows():
-                    cat_name=row["category"]
-                    amt=row["amount"]
+                    cat_name = row["category"]
+                    amt = row["amount"]
                     st.write(f" - {cat_name}: ${amt:,.2f}")
 
             if not exp_cats.empty:
                 st.markdown("<b>Expense Categories:</b>", unsafe_allow_html=True)
                 for _, row in exp_cats.iterrows():
-                    cat_name=row["category"]
-                    amt=row["amount"]
+                    cat_name = row["category"]
+                    amt = row["amount"]
                     st.write(f" - {cat_name}: ${amt:,.2f}")
 
     st.markdown("<hr>", unsafe_allow_html=True)
