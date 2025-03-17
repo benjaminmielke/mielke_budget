@@ -12,26 +12,69 @@ from dateutil.relativedelta import relativedelta
 # =============================================================================
 st.markdown("""
 <style>
-/* Prevent st.columns from wrapping */
-[data-testid="stHorizontalBlock"] {
-  flex-wrap: nowrap !important;
-}
-/* Styling for the row "bar" */
-.row-bar {
+/* The row "bar" for each line item */
+.line-item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
   background-color: #333;
   padding: 10px;
   border-radius: 5px;
   margin-bottom: 8px;
-}
-/* Text styling inside columns */
-.row-bar div {
-  overflow: hidden;
-  text-overflow: ellipsis;
+  width: 100%;
   white-space: nowrap;
 }
-/* Colors for amounts */
-.income { color: #00cc00; }
-.expense { color: #ff4444; }
+.line-item > div {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 1;
+  margin-right: 10px;
+}
+
+/* Style for HTML links acting as buttons */
+.row-button {
+  text-decoration: none;
+  background-color: #555;
+  color: #fff;
+  padding: 5px 10px;
+  border-radius: 5px;
+  margin-left: 5px;
+  font-size: 14px;
+}
+.row-button.remove {
+  background-color: #900;
+}
+
+/* Mobile adjustments */
+@media only screen and (max-width: 600px) {
+  .line-item {
+    padding: 5px;
+    font-size: 14px;
+  }
+  .row-button {
+    font-size: 12px;
+    padding: 4px 8px;
+  }
+}
+
+/* Calendar container for horizontal scrolling */
+.calendar-container {
+  overflow-x: auto;
+  width: 100%;
+}
+.calendar-container table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 16px;
+}
+@media only screen and (max-width: 600px) {
+  .calendar-container table {
+    font-size: 12px;
+  }
+  .calendar-container th, .calendar-container td {
+    padding: 5px;
+  }
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -102,10 +145,8 @@ def load_fact_data():
 
 def save_fact_data(rows_df):
     table_id = f"{PROJECT_ID}.{DATASET_ID}.{FACT_TABLE_NAME}"
-    job = client.load_table_from_dataframe(
-        rows_df, table_id,
-        job_config=bigquery.LoadJobConfig(write_disposition="WRITE_APPEND")
-    )
+    job = client.load_table_from_dataframe(rows_df, table_id,
+        job_config=bigquery.LoadJobConfig(write_disposition="WRITE_APPEND"))
     job.result()
 
 def remove_fact_row(row_id):
@@ -156,6 +197,7 @@ def insert_monthly_payments_for_debt(debt_name, total_balance, debt_due_date_str
       AND note='Auto Payoff Plan'
     """
     client.query(query).result()
+    
     digits = "".join(ch for ch in (debt_due_date_str or "") if ch.isdigit())
     day_of_month = 1
     if digits:
@@ -201,10 +243,8 @@ def insert_monthly_payments_for_debt(debt_name, total_balance, debt_due_date_str
         })
     if rows_to_insert:
         df = pd.DataFrame(rows_to_insert)
-        job = client.load_table_from_dataframe(
-            df, table_id,
-            job_config=bigquery.LoadJobConfig(write_disposition="WRITE_APPEND")
-        )
+        job = client.load_table_from_dataframe(df, table_id,
+            job_config=bigquery.LoadJobConfig(write_disposition="WRITE_APPEND"))
         job.result()
 
 def load_dimension_rows(type_val):
@@ -224,42 +264,48 @@ def add_dimension_row(type_val, category_val, budget_item_val):
         "category": category_val,
         "budget_item": budget_item_val
     }])
-    job = client.load_table_from_dataframe(
-        df, table_id,
-        job_config=bigquery.LoadJobConfig(write_disposition="WRITE_APPEND")
-    )
+    job = client.load_table_from_dataframe(df, table_id,
+        job_config=bigquery.LoadJobConfig(write_disposition="WRITE_APPEND"))
     job.result()
 
 # =============================================================================
-# Custom Row Rendering Functions for Budget Planning (Native Buttons)
+# Custom Row Rendering Functions for Budget Planning (HTML-based)
 # =============================================================================
-def render_budget_row(row, color_class):
-    """Render a budget transaction row using native st.columns."""
+def render_budget_row_html(row, color_class):
+    """Render a budget row (non-edit mode) as a custom HTML bar with inline buttons."""
     row_id = row["rowid"]
     date_str = row["date"].strftime("%Y-%m-%d")
     item_str = row["budget_item"]
     amount_str = f"${row['amount']:,.2f}"
-    with st.container():
-        with st.container():
-            st.markdown(f"<div class='row-bar'>", unsafe_allow_html=True)
-        col_date, col_item, col_amt, col_edit, col_remove = st.columns([1, 3, 1, 1, 1])
-        col_date.markdown(f"<div style='color:#fff; font-weight:bold;'>{date_str}</div>", unsafe_allow_html=True)
-        col_item.markdown(f"<div style='color:#fff;'>{item_str}</div>", unsafe_allow_html=True)
-        col_amt.markdown(f"<div style='color:{color_class};'>{amount_str}</div>", unsafe_allow_html=True)
-        if col_edit.button("Edit", key=f"edit_{row_id}"):
-            st.session_state.editing_budget_item = row_id
-            st.experimental_rerun()
-        if col_remove.button("❌", key=f"remove_{row_id}"):
-            remove_fact_row(row_id)
-            st.experimental_rerun()
-        st.markdown("</div>", unsafe_allow_html=True)
+    # Append a timestamp to force a fresh URL each click
+    ts = int(datetime.now().timestamp())
+    html = f"""
+    <div class="line-item">
+      <div style="min-width: 100px; font-weight:bold; color:#fff;">{date_str}</div>
+      <div style="flex:1; margin-left:15px; color:#fff;">{item_str}</div>
+      <div style="min-width:80px; margin-left:15px; color:{color_class};">{amount_str}</div>
+      <div>
+         <a class="row-button" href="?action=edit&rowid={row_id}&_={ts}" target="_self" onclick="window.location.href=this.href; return false;">Edit</a>
+      </div>
+      <div>
+         <a class="row-button remove" href="?action=remove&rowid={row_id}&_={ts}" target="_self" onclick="window.location.href=this.href; return false;">❌</a>
+      </div>
+    </div>
+    """
+    st.markdown(html, unsafe_allow_html=True)
 
 def render_budget_row_edit(row, color_class):
-    """Render the editing interface for a budget row using native inputs."""
+    """Render the editing interface for a budget row using native Streamlit inputs."""
     row_id = row["rowid"]
     item_str = row["budget_item"]
     amount_str = f"${row['amount']:,.2f}"
-    st.markdown(f"<div class='row-bar' style='color:#fff; font-weight:bold;'>Editing: {item_str} ({amount_str})</div>", unsafe_allow_html=True)
+    st.markdown(f"""
+    <div class="line-item" style="background-color:#444;">
+      <div style="min-width: 100px; font-weight:bold; color:#fff;">Editing...</div>
+      <div style="flex:1; margin-left:15px; color:#fff;">{item_str}</div>
+      <div style="min-width:80px; margin-left:15px; color:{color_class};">{amount_str}</div>
+    </div>
+    """, unsafe_allow_html=True)
     st.session_state.temp_budget_edit_date = st.date_input("Date", value=row["date"], key=f"edit_date_{row_id}")
     st.session_state.temp_budget_edit_amount = st.number_input("Amount", min_value=0.0, format="%.2f",
                                                                value=float(row["amount"]), key=f"edit_amount_{row_id}")
@@ -268,58 +314,72 @@ def render_budget_row_edit(row, color_class):
         update_fact_row(row_id, st.session_state.temp_budget_edit_date,
                         st.session_state.temp_budget_edit_amount)
         st.session_state.editing_budget_item = None
+        clear_query_params()
         st.experimental_rerun()
     if col2.button("Cancel", key=f"cancel_{row_id}"):
         st.session_state.editing_budget_item = None
+        clear_query_params()
         st.experimental_rerun()
 
 # =============================================================================
-# Custom Row Rendering Functions for Debt Domination (Native Buttons)
+# Custom Row Rendering Functions for Debt Domination (HTML-based)
 # =============================================================================
-def render_debt_row(row):
-    """Render a debt row using native st.columns."""
+def render_debt_row_html(row):
+    """Render a debt row (non-edit mode) as a custom HTML bar with inline buttons."""
     row_id = row["rowid"]
     row_name = row["debt_name"]
     row_balance = row["current_balance"]
     row_due = row["due_date"] if row["due_date"] else "(None)"
     row_min = row["minimum_payment"] if pd.notnull(row["minimum_payment"]) else "(None)"
     payoff_text = "Recalc" if row.get("payoff_plan_date") else "Payoff"
-    with st.container():
-        col_name, col_info, col_amt, col_edit, col_payoff, col_remove = st.columns([1, 3, 1, 1, 1, 1])
-        col_name.markdown(f"<div style='color:#fff; font-weight:bold;'>{row_name}</div>", unsafe_allow_html=True)
-        col_info.markdown(f"<div style='color:#fff;'>Due: {row_due}, Min: {row_min}</div>", unsafe_allow_html=True)
-        col_amt.markdown(f"<div style='color:red;'>${row_balance:,.2f}</div>", unsafe_allow_html=True)
-        if col_edit.button("Edit", key=f"edit_debt_{row_id}"):
-            st.session_state.editing_debt_item = row_id
-            st.experimental_rerun()
-        if col_payoff.button(payoff_text, key=f"payoff_{row_id}"):
-            st.session_state.active_payoff_plan = row_id
-            st.experimental_rerun()
-        if col_remove.button("❌", key=f"remove_debt_{row_id}"):
-            remove_debt_item(row_id)
-            st.experimental_rerun()
+    ts = int(datetime.now().timestamp())
+    html = f"""
+    <div class="line-item">
+      <div style="min-width: 60px; font-weight:bold; color:#fff;">{row_name}</div>
+      <div style="flex:1; margin-left:15px; color:#fff;">Due: {row_due}, Min: {row_min}</div>
+      <div style="min-width:80px; margin-left:15px; color:red;">${row_balance:,.2f}</div>
+      <div>
+         <a class="row-button" href="?action=edit_debt&rowid={row_id}&_={ts}" target="_self" onclick="window.location.href=this.href; return false;">Edit</a>
+      </div>
+      <div>
+         <a class="row-button" href="?action=payoff&rowid={row_id}&_={ts}" target="_self" onclick="window.location.href=this.href; return false;">{payoff_text}</a>
+      </div>
+      <div>
+         <a class="row-button remove" href="?action=remove_debt&rowid={row_id}&_={ts}" target="_self" onclick="window.location.href=this.href; return false;">❌</a>
+      </div>
+    </div>
+    """
+    st.markdown(html, unsafe_allow_html=True)
 
 def render_debt_row_edit(row):
-    """Render the editing interface for a debt row using native inputs."""
+    """Render the editing interface for a debt row using native Streamlit inputs."""
     row_id = row["rowid"]
     row_name = row["debt_name"]
     row_balance = row["current_balance"]
     row_due = row["due_date"] if row["due_date"] else "(None)"
     row_min = row["minimum_payment"] if pd.notnull(row["minimum_payment"]) else "(None)"
-    st.markdown(f"<div class='row-bar' style='color:#fff; font-weight:bold;'>Editing: {row_name}</div>", unsafe_allow_html=True)
+    st.markdown(f"""
+    <div class="line-item" style="background-color:#444;">
+      <div style="min-width: 60px; font-weight:bold; color:#fff;">Editing: {row_name}</div>
+      <div style="flex:1; margin-left:15px; color:#fff;">Due: {row_due}, Min: {row_min}</div>
+      <div style="min-width:80px; margin-left:15px; color:red;">${row_balance:,.2f}</div>
+    </div>
+    """, unsafe_allow_html=True)
     st.session_state.temp_new_balance = st.number_input("New Balance", min_value=0.0, format="%.2f",
                                                          value=float(row_balance), key=f"edit_debt_balance_{row_id}")
     col1, col2 = st.columns(2)
     if col1.button("Save", key=f"save_debt_{row_id}"):
         update_debt_item(row_id, st.session_state.temp_new_balance)
         st.session_state.editing_debt_item = None
+        clear_query_params()
         st.experimental_rerun()
     if col2.button("Cancel", key=f"cancel_debt_{row_id}"):
         st.session_state.editing_debt_item = None
+        clear_query_params()
         st.experimental_rerun()
 
 # =============================================================================
-# Process Query Parameters (if any, not used in native button approach)
+# Process Query Parameters for Actions
 # =============================================================================
 params = get_query_params_fallback()
 if "action" in params and "rowid" in params:
@@ -382,7 +442,7 @@ if page_choice == "Budget Planning":
                 st.session_state.current_month += 1
             st.experimental_rerun()
     
-    # Load and filter fact data by month/year
+    # Load and filter fact data for the current month/year
     fact_data = load_fact_data()
     fact_data.sort_values("date", ascending=True, inplace=True)
     filtered_data = fact_data[
@@ -394,7 +454,7 @@ if page_choice == "Budget Planning":
     leftover = total_income - total_expenses
     
     st.markdown(f"""
-    <div style='display:flex; justify-content: space-around; text-align:center; padding:10px 0;'>
+    <div style='display: flex; justify-content: space-around; text-align: center; padding: 10px 0;'>
       <div style='background-color:#333; padding:10px 15px; border-radius:10px;'>
          <div style='font-size:14px; color:#bbb;'>Total Income</div>
          <div style='font-size:20px; font-weight:bold; color:green;'>${total_income:,.2f}</div>
@@ -431,11 +491,10 @@ if page_choice == "Budget Planning":
     cal_df = pd.DataFrame(cal_grid, columns=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"])
     st.markdown(f'<div class="calendar-container">{cal_df.to_html(index=False, escape=False)}</div>', unsafe_allow_html=True)
     
-    # Add New Income/Expense Form with drop-downs for Category and Budget Item
+    # Add New Income/Expense Form with Drop-Downs
     st.markdown("<div class='section-subheader'>Add New Income/Expense</div>", unsafe_allow_html=True)
     date_inp = st.date_input("Date", value=datetime.today(), label_visibility="collapsed")
     type_inp = st.selectbox("Type", ["income", "expense"], label_visibility="collapsed")
-    # Load dimension data for selected type
     dim_df = load_dimension_rows(type_inp)
     cat_list = sorted(dim_df["category"].unique())
     if not cat_list:
@@ -495,7 +554,7 @@ if page_choice == "Budget Planning":
             if st.session_state.editing_budget_item == r["rowid"]:
                 render_budget_row_edit(r, "#00cc00" if r["type"]=="income" else "#ff4444")
             else:
-                render_budget_row(r, "#00cc00" if r["type"]=="income" else "#ff4444")
+                render_budget_row_html(r, "#00cc00" if r["type"]=="income" else "#ff4444")
 
 # =============================================================================
 # Page 2: Debt Domination
@@ -513,7 +572,7 @@ elif page_choice == "Debt Domination":
             if st.session_state.editing_debt_item == r["rowid"]:
                 render_debt_row_edit(r)
             else:
-                render_debt_row(r)
+                render_debt_row_html(r)
     st.markdown("<div class='section-subheader'>Add New Debt Item</div>", unsafe_allow_html=True)
     new_debt_name = st.text_input("Debt Name (e.g. 'Loft Credit Card')")
     new_debt_balance = st.number_input("Current Balance", min_value=0.0, format="%.2f")
@@ -522,10 +581,9 @@ elif page_choice == "Debt Domination":
     new_min_payment = st.text_input("Minimum Payment (Optional)")
     if st.button("Add Debt"):
         if new_debt_name.strip():
-            # Call your add_debt_item function here (omitted for brevity).
+            # Call add_debt_item function (implementation omitted for brevity)
             st.success("New debt item added (functionality assumed).")
             st.experimental_rerun()
-    
     if st.session_state.active_payoff_plan is not None:
         reloaded_debts = load_debt_items()
         match = reloaded_debts[reloaded_debts["rowid"] == st.session_state.active_payoff_plan]
@@ -558,9 +616,9 @@ elif page_choice == "Budget Overview":
     text-shadow: 0px 0px 10px #00ccff, 0px 0px 20px #00ccff;'>Budget Overview</h1>
     """, unsafe_allow_html=True)
     today = datetime.today()
-    first_month = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    start_date = first_month
-    end_date = first_month + relativedelta(months=12) - relativedelta(days=1)
+    first_of_month = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    start_date = first_of_month
+    end_date = first_of_month + relativedelta(months=12) - relativedelta(days=1)
     fact_data = load_fact_data()
     fact_data["date"] = pd.to_datetime(fact_data["date"])
     mask = (fact_data["date"] >= start_date) & (fact_data["date"] <= end_date)
@@ -569,7 +627,7 @@ elif page_choice == "Budget Overview":
     total_exp = data_12mo[data_12mo["type"]=="expense"]["amount"].sum()
     leftover = total_inc - total_exp
     st.markdown(f"""
-    <div style='display: flex; justify-content: space-around; text-align: center; padding: 10px 0;'>
+    <div style='display:flex; justify-content:space-around; text-align:center; padding:10px 0;'>
       <div style='background-color:#333; padding:10px 15px; border-radius:10px;'>
          <div style='font-size:14px; color:#bbb;'>12-Month Income</div>
          <div style='font-size:20px; font-weight:bold; color:green;'>${total_inc:,.2f}</div>
@@ -584,4 +642,4 @@ elif page_choice == "Budget Overview":
       </div>
     </div>
     """, unsafe_allow_html=True)
-    # (Additional charts or breakdowns can be added here.)
+    # Additional charts or breakdowns can be added here.
