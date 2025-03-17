@@ -8,7 +8,7 @@ import uuid
 from dateutil.relativedelta import relativedelta
 
 # =============================================================================
-# Custom CSS to style the dark bar and adjust for mobile
+# Custom CSS to style the dark bar and reduce spacing on mobile
 # =============================================================================
 st.markdown("""
 <style>
@@ -20,34 +20,35 @@ st.markdown("""
 /* Dark bar styling for each row */
 .dark-bar {
   background-color: #333;
-  padding: 10px;
+  padding: 4px;
   border-radius: 5px;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
   width: 100%;
 }
 
-/* Ensure text in the bar is kept in one line */
-.dark-bar span {
-  white-space: nowrap;
+/* Remove extra margin/padding from all elements within .dark-bar */
+.dark-bar * {
+  margin: 0 !important;
+  padding: 2px !important;
 }
 
-/* Styling for metric boxes */
+/* Metric boxes styling */
 .metric-box {
   background-color: #333;
-  padding: 10px 15px;
+  padding: 8px 10px;
   border-radius: 10px;
-  margin: 5px;
+  margin: 2px;
   text-align: center;
 }
 
 /* Mobile adjustments */
 @media only screen and (max-width: 600px) {
   .dark-bar {
-    padding: 5px;
-    font-size: 14px;
-    max-width: 400px;   /* Limit the dark bar's width */
+    max-width: 360px;  /* Limit row width on mobile */
     margin-left: auto;
     margin-right: auto;
+    font-size: 12px;
+    padding: 2px;
   }
   [data-testid="stHorizontalBlock"] > div {
     padding: 2px !important;
@@ -59,11 +60,11 @@ st.markdown("""
     margin-left: 2px !important;
   }
   .metric-box {
-    font-size: 12px;
-    padding: 5px 8px;
+    font-size: 10px;
+    padding: 4px 6px;
   }
   .calendar-container table {
-    font-size: 12px;
+    font-size: 10px;
   }
 }
 </style>
@@ -265,7 +266,7 @@ def render_budget_row_html(row, color_class):
     amount_str = f"${row['amount']:,.2f}"
     with st.container():
         st.markdown("<div class='dark-bar'>", unsafe_allow_html=True)
-        # Use smaller column ratios to reduce width on mobile
+        # Adjust column ratios to reduce spacing
         col_date, col_item, col_amt, col_edit, col_remove = st.columns([1, 2, 1, 0.8, 0.8])
         col_date.markdown(f"<span style='color:#fff; font-weight:bold;'>{date_str}</span>", unsafe_allow_html=True)
         col_item.markdown(f"<span style='color:#fff;'>{item_str}</span>", unsafe_allow_html=True)
@@ -279,7 +280,7 @@ def render_budget_row_html(row, color_class):
         st.markdown("</div>", unsafe_allow_html=True)
 
 def render_budget_row_edit(row, color_class):
-    """Render the editing interface for a budget row using native inputs."""
+    """Render an editing interface for a budget row using native inputs."""
     row_id = row["rowid"]
     item_str = row["budget_item"]
     amount_str = f"${row['amount']:,.2f}"
@@ -326,7 +327,7 @@ def render_debt_row(row):
         st.markdown("</div>", unsafe_allow_html=True)
 
 def render_debt_row_edit(row):
-    """Render the editing interface for a debt row using native inputs."""
+    """Render an editing interface for a debt row using native inputs."""
     row_id = row["rowid"]
     row_name = row["debt_name"]
     row_balance = row["current_balance"]
@@ -359,7 +360,6 @@ if page_choice == "Budget Planning":
     text-shadow: 0px 0px 10px #00ccff, 0px 0px 20px #00ccff;'>Mielke Budget</h1>
     """, unsafe_allow_html=True)
     
-    # Month navigation
     nav1, nav2, nav3, nav4 = st.columns([0.25, 1, 2, 1])
     with nav2:
         if st.button("Previous Month"):
@@ -517,7 +517,7 @@ elif page_choice == "Debt Domination":
     new_min_payment = st.text_input("Minimum Payment (Optional)")
     if st.button("Add Debt"):
         if new_debt_name.strip():
-            # Call your add_debt_item function here.
+            # Call add_debt_item function (omitted for brevity)
             st.success("New debt item added (functionality assumed).")
             st.experimental_rerun()
     if st.session_state.active_payoff_plan is not None:
@@ -536,11 +536,9 @@ elif page_choice == "Debt Domination":
             if col_d1.button("Submit"):
                 insert_monthly_payments_for_debt(plan_name, plan_balance, plan_due, st.session_state.temp_payoff_date)
                 st.session_state.active_payoff_plan = None
-                clear_query_params()
                 st.experimental_rerun()
             if col_d2.button("Cancel"):
                 st.session_state.active_payoff_plan = None
-                clear_query_params()
                 st.experimental_rerun()
 
 # =============================================================================
