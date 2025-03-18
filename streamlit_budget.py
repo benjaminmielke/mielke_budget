@@ -81,7 +81,7 @@ st.markdown("""
     justify-content: space-between;
     gap: 4px;                /* Adjust gap as needed */
     padding: 4px;
-    width: 100%;             /* Use full available width */
+    width: 50%;             /* Use full available width */
     overflow-x: auto;        /* Allow horizontal scroll if needed */
     font-size: 10px;         /* Smaller font for compact display */
     font-family: sans-serif;
