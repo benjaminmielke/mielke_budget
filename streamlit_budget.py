@@ -648,7 +648,7 @@ if page_choice == "Budget Planning":
             amount_str = f"${row['amount']:,.2f}"
             is_editing = (st.session_state["editing_budget_item"] == row_id)
 
-            main_bar_col, btns_col = st.columns([0.75, 0.25])
+            main_bar_col, btns_col = st.columns([0.70, 0.15])
 
             if is_editing:
                 with main_bar_col:
