@@ -127,6 +127,93 @@ st.markdown("""
     border-collapse: collapse;
     font-size: 10px;
 }
+
+/* Mobile-optimized transaction rows */
+.transaction-row {
+    display: flex;
+    align-items: center;
+    background-color: #333;
+    padding: 6px;
+    border-radius: 5px;
+    margin-bottom: 4px;
+    width: 100%;
+}
+
+.transaction-info {
+    flex-grow: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    overflow: hidden;
+}
+
+.transaction-date {
+    font-size: 14px;
+    font-weight: bold;
+    color: #fff;
+    min-width: 80px;
+    margin-right: 5px;
+    white-space: nowrap;
+}
+
+.transaction-item {
+    flex: 1;
+    margin-left: 4px;
+    margin-right: 4px;
+    color: #fff;
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.transaction-amount {
+    font-size: 14px;
+    font-weight: bold;
+    text-align: right;
+    min-width: 60px;
+    margin-left: 4px;
+    white-space: nowrap;
+}
+
+.transaction-buttons {
+    display: flex;
+    gap: 4px;
+    margin-left: 8px;
+    white-space: nowrap;
+}
+
+.btn-small {
+    padding: 2px 6px;
+    font-size: 12px;
+    border-radius: 3px;
+    border: none;
+    cursor: pointer;
+}
+
+.btn-edit {
+    background-color: #555;
+    color: white;
+}
+
+.btn-delete {
+    background-color: #900;
+    color: white;
+}
+
+.section-subheader {
+    font-size: 18px;
+    font-weight: bold;
+    margin-top: 15px;
+    margin-bottom: 8px;
+}
+
+.category-header {
+    font-size: 16px;
+    font-weight: bold;
+    margin-top: 12px;
+    margin-bottom: 6px;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -355,7 +442,7 @@ if "payoff" in params:
     st.experimental_rerun()
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 8) CSS snippet for “➕” button styling (unchanged)
+# 8) CSS snippet for "➕" button styling (unchanged)
 # ─────────────────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
@@ -648,80 +735,49 @@ if page_choice == "Budget Planning":
             amount_str = f"${row['amount']:,.2f}"
             is_editing = (st.session_state["editing_budget_item"] == row_id)
 
-            main_bar_col, btns_col = st.columns([0.50, 0.10])
-
             if is_editing:
-                with main_bar_col:
-                    st.markdown(f"""
-                    <div style="display:flex;align-items:center;background-color:#333;
-                                padding:8px;border-radius:5px;margin-bottom:4px;
-                                justify-content:space-between;">
-                        <div style="font-size:14px;font-weight:bold;color:#fff; min-width:80px;">
-                            Editing...
-                        </div>
-                        <div style="flex:1;margin-left:8px;color:#fff;font-size:14px;">
-                            {item_str}
-                        </div>
-                        <div style="font-size:14px;font-weight:bold;text-align:right;
-                                    min-width:60px;margin-left:8px;color:{color_class};">
-                            {amount_str}
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
+                st.markdown(f"""
+                <div style="background-color:#444; color:#fff; font-weight:bold; padding:8px; border-radius:5px; margin-bottom:10px;">
+                    Editing: {item_str} ({amount_str})
+                </div>
+                """, unsafe_allow_html=True)
 
-                    st.session_state["temp_budget_edit_date"] = st.date_input(
-                        "Date", value=row["date"], key=f"edit_date_{row_id}"
+                st.session_state["temp_budget_edit_date"] = st.date_input(
+                    "Date", value=row["date"], key=f"edit_date_{row_id}"
+                )
+                st.session_state["temp_budget_edit_amount"] = st.number_input(
+                    "Amount", min_value=0.0, format="%.2f", 
+                    value=float(row["amount"]), key=f"edit_amount_{row_id}"
+                )
+
+                sc1, sc2 = st.columns(2)
+                if sc1.button("Save", key=f"save_{row_id}"):
+                    update_fact_row(
+                        row_id, 
+                        st.session_state["temp_budget_edit_date"],
+                        st.session_state["temp_budget_edit_amount"]
                     )
-                    st.session_state["temp_budget_edit_amount"] = st.number_input(
-                        "Amount", min_value=0.0, format="%.2f", 
-                        value=float(row["amount"]), key=f"edit_amount_{row_id}"
-                    )
-
-                    sc1, sc2 = st.columns(2)
-                    if sc1.button("Save", key=f"save_{row_id}"):
-                        update_fact_row(
-                            row_id, 
-                            st.session_state["temp_budget_edit_date"],
-                            st.session_state["temp_budget_edit_amount"]
-                        )
-                        st.session_state["editing_budget_item"] = None
-                        st.experimental_rerun()
-                    if sc2.button("Cancel", key=f"cancel_{row_id}"):
-                        st.session_state["editing_budget_item"] = None
-                        st.experimental_rerun()
-
-                with btns_col:
-                    if st.button("❌", key=f"remove_{row_id}"):
-                        remove_fact_row(row_id)
-                        st.experimental_rerun()
-
+                    st.session_state["editing_budget_item"] = None
+                    st.experimental_rerun()
+                if sc2.button("Cancel", key=f"cancel_{row_id}"):
+                    st.session_state["editing_budget_item"] = None
+                    st.experimental_rerun()
             else:
-                with main_bar_col:
-                    st.markdown(f"""
-                    <div style="display:flex;align-items:center;background-color:#333;
-                                padding:8px;border-radius:5px;margin-bottom:4px;
-                                justify-content:space-between;">
-                        <div style="font-size:14px;font-weight:bold;color:#fff; min-width:80px;">
-                            {date_str}
-                        </div>
-                        <div style="flex:1;margin-left:8px;color:#fff;font-size:14px;">
-                            {item_str}
-                        </div>
-                        <div style="font-size:14px;font-weight:bold;text-align:right;
-                                    min-width:60px;margin-left:8px;color:{color_class};">
-                            {amount_str}
-                        </div>
+                # Mobile-optimized single line layout
+                html = f"""
+                <div class="transaction-row">
+                    <div class="transaction-info">
+                        <div class="transaction-date">{date_str}</div>
+                        <div class="transaction-item">{item_str}</div>
+                        <div class="transaction-amount" style="color:{color_class}">{amount_str}</div>
                     </div>
-                    """, unsafe_allow_html=True)
-
-                with btns_col:
-                    e_col, x_col = st.columns(2)
-                    if e_col.button("Edit", key=f"editbtn_{row_id}"):
-                        st.session_state["editing_budget_item"] = row_id
-                        st.experimental_rerun()
-                    if x_col.button("❌", key=f"removebtn_{row_id}"):
-                        remove_fact_row(row_id)
-                        st.experimental_rerun()
+                    <div class="transaction-buttons">
+                        <button class="btn-small btn-edit" onclick="window.location.href='?action=edit&rowid={row_id}'">Edit</button>
+                        <button class="btn-small btn-delete" onclick="window.location.href='?action=remove&rowid={row_id}'">❌</button>
+                    </div>
+                </div>
+                """
+                st.markdown(html, unsafe_allow_html=True)
 
         if not inc_data.empty:
             for cat_name, group_df in inc_data.groupby("category"):
