@@ -74,8 +74,8 @@ st.markdown("""
 <style>
 /* Container for each line item */
 .line-item-container {
+    display: flex;
     align-items: center;
-    flex-wrap: nowrap;
     gap: 2px;
     background-color: #333;
     padding: 4px;
@@ -653,7 +653,7 @@ if page_choice == "Budget Planning":
             if is_editing:
                 with main_bar_col:
                     st.markdown(f"""
-                    <div style="display:flex;align-items:center;background-color:#777;
+                    <div style="display:flex;align-items:center;background-color:#333;
                                 padding:8px;border-radius:5px;margin-bottom:4px;
                                 justify-content:space-between;">
                         <div style="font-size:14px;font-weight:bold;color:#fff; min-width:80px;">
@@ -698,7 +698,7 @@ if page_choice == "Budget Planning":
             else:
                 with main_bar_col:
                     st.markdown(f"""
-                    <div style="display:flex;align-items:center;background-color:#777;
+                    <div style="display:flex;align-items:center;background-color:#333;
                                 padding:8px;border-radius:5px;margin-bottom:4px;
                                 justify-content:space-between;">
                         <div style="font-size:14px;font-weight:bold;color:#fff; min-width:80px;">
