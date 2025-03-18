@@ -717,8 +717,11 @@ if page_choice == "Budget Planning":
                 with btns_col:
                     e_col, x_col = st.columns(2)
                     if e_col.button("Edit", key=f"editbtn_{row_id}"):
-                        st.session_state["editing_budget_item"] = row_id
-                        st.experimental_rerun()
+                       st.session_state["editing_budget_item"] = row_id
+                       try:
+                           st.experimental_rerun()
+                        except AttributeError:
+                            st.stop()
                     if x_col.button("❌", key=f"removebtn_{row_id}"):
                         remove_fact_row(row_id)
                         st.experimental_rerun()
