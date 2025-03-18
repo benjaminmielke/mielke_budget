@@ -76,19 +76,63 @@ st.markdown("""
 .line-item-container {
     display: flex;
     align-items: center;
+    flex-wrap: nowrap;
     gap: 2px;
     background-color: #333;
     padding: 4px;
     border-radius: 4px;
     margin: 4px auto;
+    width: 100%;
     max-width: 360px;
     font-size: 12px;
     font-family: sans-serif;
 }
 
+/* Item content - make sure it shrinks to fit */
+.item-content {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
 /* Prevent spans from wrapping */
 .line-item-container span {
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Date styling */
+.item-date {
+    min-width: 75px;
+    font-weight: bold;
+    color: white;
+}
+
+/* Name styling */
+.item-name {
+    flex: 1;
+    min-width: 10px;
+    padding: 0 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: white;
+}
+
+/* Amount styling */
+.item-amount {
+    min-width: 60px;
+    font-weight: bold;
+    text-align: right;
+}
+
+/* Button container */
+.button-container {
+    display: flex;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 /* Inline button styles */
@@ -98,9 +142,13 @@ st.markdown("""
     border: none;
     border-radius: 3px;
     padding: 2px 4px;
+    margin: 0 1px;
     font-size: 10px;
     cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
 }
+
 .line-item-button.remove {
     background-color: #900;
 }
@@ -462,11 +510,15 @@ def render_transaction_row(row, color_class):
     amount_str = f"${row['amount']:,.2f}"
     html = f"""
     <div class="line-item-container">
-      <span style="color:#fff; font-weight:bold;">{date_str}</span>
-      <span style="color:#fff;">{item_str}</span>
-      <span style="color:{color_class};">{amount_str}</span>
-      <a href="?action=edit&rowid={row_id}" class="line-item-button">Edit</a>
-      <a href="?action=remove&rowid={row_id}" class="line-item-button remove">❌</a>
+      <div class="item-content">
+        <div class="item-date">{date_str}</div>
+        <div class="item-name">{item_str}</div>
+        <div class="item-amount" style="color:{color_class}">{amount_str}</div>
+      </div>
+      <div class="button-container">
+        <a href="?action=edit&rowid={row_id}" class="line-item-button">Edit</a>
+        <a href="?action=remove&rowid={row_id}" class="line-item-button remove">❌</a>
+      </div>
     </div>
     """
     st.markdown(html, unsafe_allow_html=True)
@@ -496,14 +548,21 @@ def render_debt_transaction_row(row):
     min_pay = row["minimum_payment"] if pd.notnull(row["minimum_payment"]) else "(None)"
     payoff_text = "Recalc" if row.get("payoff_plan_date") else "Payoff"
     payoff_action = "recalc" if row.get("payoff_plan_date") else "payoff"
+    payoff_color = "green" if row.get("payoff_plan_date") else "yellow"
+    payoff_text_color = "white" if row.get("payoff_plan_date") else "black"
+    
     html = f"""
     <div class="line-item-container">
-      <span style="color:#fff; font-weight:bold;">{name}</span>
-      <span style="color:#fff;">Due: {due}, Min: {min_pay}</span>
-      <span style="color:red;">{balance_str}</span>
-      <a href="?action=edit_debt&rowid={row_id}" class="line-item-button">Edit</a>
-      <a href="?{payoff_action}={row_id}" class="line-item-button" style="background-color:{'green' if payoff_text=='Recalc' else 'yellow'}; color:{'white' if payoff_text=='Recalc' else 'black'};">{payoff_text}</a>
-      <a href="?action=remove_debt&rowid={row_id}" class="line-item-button remove">❌</a>
+      <div class="item-content">
+        <div class="item-name" style="font-weight:bold; min-width:60px;">{name}</div>
+        <div class="item-name">Due: {due}, Min: {min_pay}</div>
+        <div class="item-amount" style="color:red">{balance_str}</div>
+      </div>
+      <div class="button-container">
+        <a href="?action=edit_debt&rowid={row_id}" class="line-item-button">Edit</a>
+        <a href="?{payoff_action}={row_id}" class="line-item-button" style="background-color:{payoff_color}; color:{payoff_text_color};">{payoff_text}</a>
+        <a href="?action=remove_debt&rowid={row_id}" class="line-item-button remove">❌</a>
+      </div>
     </div>
     """
     st.markdown(html, unsafe_allow_html=True)
