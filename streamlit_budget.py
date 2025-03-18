@@ -67,6 +67,16 @@ if "active_payoff_plan" not in st.session_state:
 if "temp_payoff_date" not in st.session_state:
     st.session_state["temp_payoff_date"] = datetime.today().date()
 
+st.markdown("""
+<style>
+/* Force Streamlit horizontal blocks (st.columns) to not wrap on narrow screens */
+div[data-testid="stHorizontalBlock"] {
+    flex-wrap: nowrap;
+    overflow-x: auto; /* Enable horizontal scrolling if necessary */
+}
+</style>
+""", unsafe_allow_html=True)
+
 # ─────────────────────────────────────────────────────────────────────────────
 # 2) (Optional) CSS for Minor Global Styling
 # ─────────────────────────────────────────────────────────────────────────────
