@@ -73,7 +73,7 @@ if "temp_payoff_date" not in st.session_state:
 # ─────────────────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-/* Container for each line item (for inline HTML rendering) */
+/* Container for each line item */
 .line-item-container {
     display: flex;
     align-items: center;
@@ -323,6 +323,20 @@ def insert_monthly_payments_for_debt(debt_name, total_balance, debt_due_date_str
 # 7) Query Parameter Processing
 # ─────────────────────────────────────────────────────────────────────────────
 params = get_query_params_fallback()
+# New: Process swipe actions for edit or remove
+if "action" in params and "rowid" in params:
+    action = params["action"][0] if isinstance(params["action"], list) else params["action"]
+    row_id = params["rowid"][0] if isinstance(params["rowid"], list) else params["rowid"]
+    if action == "remove":
+        remove_fact_row(row_id)
+        set_query_params_fallback()
+        st.experimental_rerun()
+    elif action == "edit":
+        st.session_state["editing_budget_item"] = row_id
+        set_query_params_fallback()
+        st.experimental_rerun()
+
+# Existing processing for recalculation and payoff actions
 if "recalc" in params:
     row_id = params["recalc"]
     if isinstance(row_id, list):
@@ -370,7 +384,6 @@ page_choice = st.sidebar.radio("Navigation", ["Budget Planning", "Debt Dominatio
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Helper functions to render transaction and debt rows using inline HTML
-# (the original functions are still here for comparison)
 def render_transaction_row(row, color_class):
     row_id = row["rowid"]
     date_str = row["date"].strftime("%Y-%m-%d")
@@ -438,7 +451,6 @@ def render_debt_transaction_edit(row):
 
 # ─────────────────────────────────────────────────────────────────────────────
 # New: Swipeable Transaction Row Component
-# ─────────────────────────────────────────────────────────────────────────────
 def render_swipe_transaction_row(row, color_class):
     """
     Render a transaction row that supports swipe gestures.
@@ -521,7 +533,6 @@ def render_swipe_transaction_row(row, color_class):
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Updated render_budget_row with try/except blocks for st.experimental_rerun()
-# ─────────────────────────────────────────────────────────────────────────────
 def render_budget_row(row, color_class):
     row_id = row["rowid"]
     date_str = row["date"].strftime("%Y-%m-%d")
@@ -621,7 +632,6 @@ def render_budget_row(row, color_class):
 
 # ─────────────────────────────────────────────────────────────────────────────
 # PAGE 1: Budget Planning
-# ─────────────────────────────────────────────────────────────────────────────
 if page_choice == "Budget Planning":
     st.markdown("""
         <h1 style='text-align: center; font-size: 50px; font-weight: bold; 
@@ -631,7 +641,6 @@ if page_choice == "Budget Planning":
         </h1>
     """, unsafe_allow_html=True)
 
-    # Display Month Title and Navigation Buttons in one horizontal block
     current_month = st.session_state["current_month"]
     current_year = st.session_state["current_year"]
     st.markdown(f"<div style='text-align: center; font-size: 24px; font-weight: bold; padding: 10px;'>{calendar.month_name[current_month]} {current_year}</div>", unsafe_allow_html=True)
@@ -681,7 +690,7 @@ if page_choice == "Budget Planning":
     </div>
     """, unsafe_allow_html=True)
 
-    # Build a day-grid calendar for the selected month
+    # Build day-grid calendar (unchanged)
     days_in_month = calendar.monthrange(current_year, current_month)[1]
     first_weekday = (calendar.monthrange(current_year, current_month)[0] + 1) % 7
     calendar_grid = [["" for _ in range(7)] for _ in range(6)]
@@ -704,8 +713,6 @@ if page_choice == "Budget Planning":
     st.markdown(f'<div class="calendar-container">{cal_df.to_html(index=False, escape=False)}</div>', unsafe_allow_html=True)
 
     st.markdown("<div class='section-subheader'>Add New Income/Expense</div>", unsafe_allow_html=True)
-
-    # Form to add Income/Expense
     cA, cB = st.columns([1,3])
     with cA:
         st.write("Date:")
@@ -810,20 +817,18 @@ if page_choice == "Budget Planning":
             st.experimental_rerun()
 
     st.markdown("<div class='section-subheader'>Transactions This Month</div>", unsafe_allow_html=True)
-
     if filtered_data.empty:
         st.write("No transactions found for this month.")
     else:
         inc_data = filtered_data[filtered_data["type"]=="income"]
         exp_data = filtered_data[filtered_data["type"]=="expense"]
 
-        # Here we use our swipeable component instead of the default inline HTML row.
+        # Use the swipeable row component for transactions
         if not inc_data.empty:
             for cat_name, group_df in inc_data.groupby("category"):
                 st.markdown(f"<div class='category-header'>{cat_name}</div>", unsafe_allow_html=True)
                 for _, row in group_df.iterrows():
                     render_swipe_transaction_row(row, "#00cc00")
-
         if not exp_data.empty:
             for cat_name, group_df in exp_data.groupby("category"):
                 st.markdown(f"<div class='category-header'>{cat_name}</div>", unsafe_allow_html=True)
@@ -832,7 +837,6 @@ if page_choice == "Budget Planning":
 
 # ─────────────────────────────────────────────────────────────────────────────
 # PAGE 2: Debt Domination
-# ─────────────────────────────────────────────────────────────────────────────
 elif page_choice == "Debt Domination":
     st.markdown("""
         <h1 style='text-align: center; font-size: 50px; font-weight: bold; color: black;
@@ -840,10 +844,8 @@ elif page_choice == "Debt Domination":
             Debt Domination
         </h1>
     """, unsafe_allow_html=True)
-
     debt_df = load_debt_items()
     total_debt = debt_df["current_balance"].sum() if not debt_df.empty else 0.0
-
     st.markdown(f"""
     <div style='display: flex; justify-content: center; text-align: center; padding:10px 0;'>
         <div class='metric-box'>
@@ -852,9 +854,7 @@ elif page_choice == "Debt Domination":
         </div>
     </div>
     """, unsafe_allow_html=True)
-
     st.subheader("Your Debts")
-
     if debt_df.empty:
         st.write("No debt items found.")
     else:
@@ -865,11 +865,8 @@ elif page_choice == "Debt Domination":
             row_due = row["due_date"] if row["due_date"] else "(None)"
             row_min = row["minimum_payment"] if pd.notnull(row["minimum_payment"]) else "(None)"
             plan_date = row["payoff_plan_date"] if pd.notnull(row["payoff_plan_date"]) else None
-
             is_editing = (st.session_state["editing_debt_item"] == row_id)
-
             main_bar_col, btns_col = st.columns([0.70, 0.30])
-
             if is_editing:
                 with main_bar_col:
                     st.markdown(f"""
@@ -884,7 +881,6 @@ elif page_choice == "Debt Domination":
                         </div>
                     </div>
                     """, unsafe_allow_html=True)
-
                     st.session_state["temp_new_balance"] = st.number_input(
                         "New Balance",
                         min_value=0.0,
@@ -900,13 +896,11 @@ elif page_choice == "Debt Domination":
                     if c_col.button("Cancel", key=f"cancel_debt_{row_id}"):
                         st.session_state["editing_debt_item"] = None
                         st.experimental_rerun()
-
                 with btns_col:
                     if st.button("❌", key=f"remove_debt_{row_id}"):
                         remove_debt_item(row_id)
                         remove_old_payoff_lines_for_debt(row_name)
                         st.experimental_rerun()
-
             else:
                 with main_bar_col:
                     st.markdown(f"""
@@ -925,12 +919,10 @@ elif page_choice == "Debt Domination":
                         </div>
                     </div>
                     """, unsafe_allow_html=True)
-
                 with btns_col:
                     e_col, payoff_col, x_col = st.columns([0.25, 0.50, 0.25])
                     edit_clicked = e_col.button("Edit", key=f"edit_debt_{row_id}")
                     remove_clicked = x_col.button("❌", key=f"remove_btn_{row_id}")
-
                     if plan_date:
                         payoff_html = f"""
                         <div style="text-align:center;">
@@ -955,7 +947,6 @@ elif page_choice == "Debt Domination":
                         </div>
                         """
                         payoff_col.markdown(payoff_html, unsafe_allow_html=True)
-
                     if edit_clicked:
                         st.session_state["editing_debt_item"] = row_id
                         st.experimental_rerun()
@@ -963,7 +954,6 @@ elif page_choice == "Debt Domination":
                         remove_debt_item(row_id)
                         remove_old_payoff_lines_for_debt(row_name)
                         st.experimental_rerun()
-
     if st.session_state["active_payoff_plan"] is not None:
         reloaded_df = load_debt_items()
         match = reloaded_df[reloaded_df["rowid"]==st.session_state["active_payoff_plan"]]
@@ -974,7 +964,6 @@ elif page_choice == "Debt Domination":
             plan_due = plan_data["due_date"] if plan_data["due_date"] else ""
             st.markdown("<hr>", unsafe_allow_html=True)
             st.subheader(f"Payoff Plan for {plan_name}")
-
             st.session_state["temp_payoff_date"] = st.date_input(
                 "What date do you want to pay this off by?",
                 value=st.session_state["temp_payoff_date"]
@@ -994,13 +983,11 @@ elif page_choice == "Debt Domination":
                 WHERE rowid = '{st.session_state["active_payoff_plan"]}'
                 """
                 client.query(query).result()
-
                 st.session_state["active_payoff_plan"] = None
                 st.experimental_rerun()
             if cancel_col.button("Cancel"):
                 st.session_state["active_payoff_plan"] = None
                 st.experimental_rerun()
-
     st.subheader("Add a New Debt Item")
     new_debt_name = st.text_input("Debt Name (e.g. 'Loft Credit Card')", "")
     new_debt_balance = st.number_input("Current Balance", min_value=0.0, format="%.2f", value=0.0)
@@ -1014,7 +1001,6 @@ elif page_choice == "Debt Domination":
 
 # ─────────────────────────────────────────────────────────────────────────────
 # PAGE 3: Budget Overview (Forward 12 months)
-# ─────────────────────────────────────────────────────────────────────────────
 elif page_choice == "Budget Overview":
     st.markdown("""
         <h1 style='text-align: center; font-size: 50px; font-weight: bold;
@@ -1023,21 +1009,17 @@ elif page_choice == "Budget Overview":
             Budget Overview
         </h1>
     """, unsafe_allow_html=True)
-
     today = datetime.today()
     first_of_this_month = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     start_date = first_of_this_month
     end_date = first_of_this_month + relativedelta(months=12) - relativedelta(days=1)
-
     fact_data = load_fact_data()
     fact_data["date"] = pd.to_datetime(fact_data["date"])
     mask = (fact_data["date"]>=start_date) & (fact_data["date"]<=end_date)
     data_12mo = fact_data[mask].copy()
-
     total_inc_12 = data_12mo[data_12mo["type"]=="income"]["amount"].sum()
     total_exp_12 = data_12mo[data_12mo["type"]=="expense"]["amount"].sum()
     leftover_12 = total_inc_12 - total_exp_12
-
     st.markdown(f"""
     <div style='display: flex; justify-content: center; gap: 8px; padding: 10px 0;'>
         <div class="metric-box">
@@ -1054,25 +1036,20 @@ elif page_choice == "Budget Overview":
         </div>
     </div>
     """, unsafe_allow_html=True)
-
     data_12mo["year_month"] = data_12mo["date"].dt.to_period("M")
     monthly_sums = data_12mo.groupby(["year_month","type"])["amount"].sum().reset_index()
     monthly_cat = data_12mo.groupby(["year_month","type","category"])["amount"].sum().reset_index()
-
     monthly_sums.sort_values("year_month", inplace=True)
     monthly_cat.sort_values(["year_month","type","category"], inplace=True)
     unique_months = monthly_sums["year_month"].drop_duplicates().sort_values()
-
     for ym in unique_months:
         y = ym.year
         m = ym.month
         m_name = calendar.month_name[m]
         display_str = f"{m_name} {y}"
-
         inc_val = monthly_sums[(monthly_sums["year_month"]==ym)&(monthly_sums["type"]=="income")]["amount"].sum()
         exp_val = monthly_sums[(monthly_sums["year_month"]==ym)&(monthly_sums["type"]=="expense")]["amount"].sum()
         leftover_val = inc_val - exp_val
-
         st.markdown(f"""
         <div style="margin-top:20px; padding:5px; background-color:#222; border-radius:5px;">
             <h3 style="color:#66ccff; margin:5px 0;">{display_str}</h3>
@@ -1091,27 +1068,23 @@ elif page_choice == "Budget Overview":
             </div>
         </div>
         """, unsafe_allow_html=True)
-
         mo_details = monthly_cat[monthly_cat["year_month"]==ym].copy()
         if mo_details.empty:
             st.write("No transactions for this month.")
         else:
             inc_cats = mo_details[mo_details["type"]=="income"]
             exp_cats = mo_details[mo_details["type"]=="expense"]
-
             if not inc_cats.empty:
                 st.markdown("<b>Income Categories:</b>", unsafe_allow_html=True)
                 for _, row in inc_cats.iterrows():
                     cat_name = row["category"]
                     amt = row["amount"]
                     st.write(f" - {cat_name}: ${amt:,.2f}")
-
             if not exp_cats.empty:
                 st.markdown("<b>Expense Categories:</b>", unsafe_allow_html=True)
                 for _, row in exp_cats.iterrows():
                     cat_name = row["category"]
                     amt = row["amount"]
                     st.write(f" - {cat_name}: ${amt:,.2f}")
-
     st.markdown("<hr>", unsafe_allow_html=True)
     st.write("End of 12-month Forward Budget Overview")
