@@ -129,76 +129,78 @@ st.markdown("""
 }
 
 /* Mobile-optimized transaction rows */
-.transaction-row {
+.mobile-row {
     display: flex;
+    flex-direction: row;
+    justify-content: space-between;
     align-items: center;
     background-color: #333;
-    padding: 6px;
+    padding: 8px;
     border-radius: 5px;
-    margin-bottom: 4px;
+    margin-bottom: 5px;
     width: 100%;
+    box-sizing: border-box;
 }
 
-.transaction-info {
-    flex-grow: 1;
+.mobile-info {
     display: flex;
+    flex-direction: row;
     align-items: center;
-    justify-content: space-between;
+    flex-grow: 1;
+    min-width: 0;
     overflow: hidden;
 }
 
-.transaction-date {
-    font-size: 14px;
+.mobile-date {
+    color: white;
     font-weight: bold;
-    color: #fff;
-    min-width: 80px;
-    margin-right: 5px;
+    font-size: 13px;
+    margin-right: 8px;
     white-space: nowrap;
+    min-width: 80px;
 }
 
-.transaction-item {
-    flex: 1;
-    margin-left: 4px;
-    margin-right: 4px;
-    color: #fff;
-    font-size: 14px;
-    white-space: nowrap;
+.mobile-name {
+    color: white;
+    font-size: 13px;
+    flex-grow: 1;
     overflow: hidden;
     text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-right: 8px;
 }
 
-.transaction-amount {
-    font-size: 14px;
+.mobile-amount {
     font-weight: bold;
-    text-align: right;
-    min-width: 60px;
-    margin-left: 4px;
+    font-size: 13px;
     white-space: nowrap;
+    margin-right: 8px;
 }
 
-.transaction-buttons {
+.mobile-buttons {
     display: flex;
-    gap: 4px;
-    margin-left: 8px;
+    flex-direction: row;
     white-space: nowrap;
+    flex-shrink: 0;
 }
 
-.btn-small {
-    padding: 2px 6px;
-    font-size: 12px;
+.mobile-button {
+    padding: 3px 8px;
+    margin: 0 2px;
     border-radius: 3px;
-    border: none;
-    cursor: pointer;
+    font-size: 11px;
+    color: white;
+    text-decoration: none;
+    display: inline-block;
+    text-align: center;
 }
 
-.btn-edit {
+.mobile-edit {
     background-color: #555;
-    color: white;
 }
 
-.btn-delete {
+.mobile-delete {
     background-color: #900;
-    color: white;
 }
 
 .section-subheader {
@@ -417,6 +419,40 @@ def insert_monthly_payments_for_debt(debt_name, total_balance, debt_due_date_str
 # 7) Query Parameter Processing
 # ─────────────────────────────────────────────────────────────────────────────
 params = get_query_params_fallback()
+
+# Handle edit and remove actions
+if "action" in params and "rowid" in params:
+    action = params["action"]
+    row_id = params["rowid"]
+    
+    if isinstance(action, list):
+        action = action[0]
+    if isinstance(row_id, list):
+        row_id = row_id[0]
+        
+    if action == "edit":
+        st.session_state["editing_budget_item"] = row_id
+        set_query_params_fallback()
+        st.experimental_rerun()
+    elif action == "remove":
+        remove_fact_row(row_id)
+        set_query_params_fallback()
+        st.experimental_rerun()
+    elif action == "edit_debt":
+        st.session_state["editing_debt_item"] = row_id
+        set_query_params_fallback()
+        st.experimental_rerun()
+    elif action == "remove_debt":
+        debt_df = load_debt_items()
+        match = debt_df[debt_df["rowid"] == row_id]
+        if not match.empty:
+            debt_name = match.iloc[0]["debt_name"]
+            remove_debt_item(row_id)
+            remove_old_payoff_lines_for_debt(debt_name)
+        set_query_params_fallback()
+        st.experimental_rerun()
+
+# Handle recalc and payoff actions
 if "recalc" in params:
     row_id = params["recalc"]
     if isinstance(row_id, list):
@@ -763,39 +799,20 @@ if page_choice == "Budget Planning":
                     st.session_state["editing_budget_item"] = None
                     st.experimental_rerun()
             else:
-                # Create a single row container with all elements
-                col1, col2 = st.columns([0.8, 0.2])
-                
-                with col1:
-                    # Transaction info
-                    st.markdown(f"""
-                    <div style="display:flex; align-items:center; background-color:#333; 
-                              padding:8px; border-radius:5px; margin-bottom:4px;">
-                        <div style="min-width:80px; font-size:14px; font-weight:bold; color:#fff;">
-                            {date_str}
-                        </div>
-                        <div style="flex:1; margin-left:4px; color:#fff; font-size:14px; 
-                                  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-                            {item_str}
-                        </div>
-                        <div style="min-width:60px; margin-left:4px; font-size:14px; 
-                                  font-weight:bold; text-align:right; color:{color_class};">
-                            {amount_str}
-                        </div>
+                # Pure HTML approach for mobile-friendly single line
+                st.markdown(f"""
+                <div class="mobile-row">
+                    <div class="mobile-info">
+                        <div class="mobile-date">{date_str}</div>
+                        <div class="mobile-name">{item_str}</div>
+                        <div class="mobile-amount" style="color:{color_class}">{amount_str}</div>
                     </div>
-                    """, unsafe_allow_html=True)
-                
-                with col2:
-                    # Action buttons
-                    btn_col1, btn_col2 = st.columns(2)
-                    
-                    if btn_col1.button("Edit", key=f"editbtn_{row_id}", help="Edit this transaction"):
-                        st.session_state["editing_budget_item"] = row_id
-                        st.experimental_rerun()
-                        
-                    if btn_col2.button("❌", key=f"removebtn_{row_id}", help="Delete this transaction"):
-                        remove_fact_row(row_id)
-                        st.experimental_rerun()
+                    <div class="mobile-buttons">
+                        <a href="?action=edit&rowid={row_id}" class="mobile-button mobile-edit">Edit</a>
+                        <a href="?action=remove&rowid={row_id}" class="mobile-button mobile-delete">❌</a>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
 
         # Display income transactions
         if not inc_data.empty:
@@ -849,101 +866,46 @@ elif page_choice == "Debt Domination":
 
             is_editing = (st.session_state["editing_debt_item"] == row_id)
 
-            main_bar_col, btns_col = st.columns([0.70, 0.30])
-
             if is_editing:
-                with main_bar_col:
-                    st.markdown(f"""
-                    <div style="display:flex;align-items:center;background-color:#333;
-                                padding:8px;border-radius:5px;margin-bottom:4px;
-                                justify-content:space-between;">
-                        <div style="font-size:14px; font-weight:bold; color:#fff; min-width:60px;">
-                            {row_name}
-                        </div>
-                        <div style="flex:1; margin-left:8px; color:#fff; font-size:14px;">
-                            Due: {row_due}, Min: {row_min}
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
+                st.markdown(f"""
+                <div style="background-color:#444; color:#fff; font-weight:bold; padding:8px; border-radius:5px; margin-bottom:10px;">
+                    Editing: {row_name}
+                </div>
+                """, unsafe_allow_html=True)
 
-                    st.session_state["temp_new_balance"] = st.number_input(
-                        "New Balance",
-                        min_value=0.0,
-                        format="%.2f",
-                        key=f"edit_debt_balance_{row_id}",
-                        value=float(row_balance)
-                    )
-                    s_col, c_col = st.columns(2)
-                    if s_col.button("Save", key=f"save_debt_{row_id}"):
-                        update_debt_item(row_id, st.session_state["temp_new_balance"])
-                        st.session_state["editing_debt_item"] = None
-                        st.experimental_rerun()
-                    if c_col.button("Cancel", key=f"cancel_debt_{row_id}"):
-                        st.session_state["editing_debt_item"] = None
-                        st.experimental_rerun()
-
-                with btns_col:
-                    if st.button("❌", key=f"remove_debt_{row_id}"):
-                        remove_debt_item(row_id)
-                        remove_old_payoff_lines_for_debt(row_name)
-                        st.experimental_rerun()
-
+                st.session_state["temp_new_balance"] = st.number_input(
+                    "New Balance",
+                    min_value=0.0,
+                    format="%.2f",
+                    key=f"edit_debt_balance_{row_id}",
+                    value=float(row_balance)
+                )
+                s_col, c_col = st.columns(2)
+                if s_col.button("Save", key=f"save_debt_{row_id}"):
+                    update_debt_item(row_id, st.session_state["temp_new_balance"])
+                    st.session_state["editing_debt_item"] = None
+                    st.experimental_rerun()
+                if c_col.button("Cancel", key=f"cancel_debt_{row_id}"):
+                    st.session_state["editing_debt_item"] = None
+                    st.experimental_rerun()
             else:
-                with main_bar_col:
-                    st.markdown(f"""
-                    <div style="display:flex;align-items:center;background-color:#333;
-                                padding:8px;border-radius:5px;margin-bottom:4px;
-                                justify-content:space-between;">
-                        <div style="font-size:14px; font-weight:bold; color:#fff; min-width:60px;">
-                            {row_name}
-                        </div>
-                        <div style="flex:1; margin-left:8px; color:#fff; font-size:14px;">
-                            Due: {row_due}, Min: {row_min}
-                        </div>
-                        <div style="font-size:14px; font-weight:bold; text-align:right;
-                                    min-width:60px; margin-left:8px; color:red;">
-                            ${row_balance:,.2f}
-                        </div>
+                # Pure HTML approach for mobile-friendly single line debt rows
+                payoff_button = f"""<a href="?recalc={row_id}" class="mobile-button" style="background-color:green;">Recalc</a>""" if plan_date else f"""<a href="?payoff={row_id}" class="mobile-button" style="background-color:yellow; color:black;">Payoff</a>"""
+                
+                st.markdown(f"""
+                <div class="mobile-row">
+                    <div class="mobile-info">
+                        <div class="mobile-name" style="font-weight:bold;">{row_name}</div>
+                        <div class="mobile-name">Due: {row_due}, Min: {row_min}</div>
+                        <div class="mobile-amount" style="color:red;">${row_balance:,.2f}</div>
                     </div>
-                    """, unsafe_allow_html=True)
-
-                with btns_col:
-                    e_col, payoff_col, x_col = st.columns([0.25, 0.50, 0.25])
-                    edit_clicked = e_col.button("Edit", key=f"edit_debt_{row_id}")
-                    remove_clicked = x_col.button("❌", key=f"remove_btn_{row_id}")
-
-                    if plan_date:
-                        payoff_html = f"""
-                        <div style="text-align:center;">
-                            <a href="?recalc={row_id}" 
-                               style="display:inline-block; background-color:green; color:white; 
-                                      font-weight:bold; border-radius:5px; padding:4px 8px; 
-                                      text-decoration:none;">
-                                Recalc
-                            </a>
-                        </div>
-                        """
-                        payoff_col.markdown(payoff_html, unsafe_allow_html=True)
-                    else:
-                        payoff_html = f"""
-                        <div style="text-align:center;">
-                            <a href="?payoff={row_id}" 
-                               style="display:inline-block; background-color:yellow; color:black; 
-                                      font-weight:bold; border-radius:5px; padding:4px 8px; 
-                                      text-decoration:none;">
-                                Payoff
-                            </a>
-                        </div>
-                        """
-                        payoff_col.markdown(payoff_html, unsafe_allow_html=True)
-
-                    if edit_clicked:
-                        st.session_state["editing_debt_item"] = row_id
-                        st.experimental_rerun()
-                    if remove_clicked:
-                        remove_debt_item(row_id)
-                        remove_old_payoff_lines_for_debt(row_name)
-                        st.experimental_rerun()
+                    <div class="mobile-buttons">
+                        <a href="?action=edit_debt&rowid={row_id}" class="mobile-button mobile-edit">Edit</a>
+                        {payoff_button}
+                        <a href="?action=remove_debt&rowid={row_id}" class="mobile-button mobile-delete">❌</a>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
 
     if st.session_state["active_payoff_plan"] is not None:
         reloaded_df = load_debt_items()
