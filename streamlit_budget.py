@@ -67,30 +67,45 @@ if "active_payoff_plan" not in st.session_state:
 if "temp_payoff_date" not in st.session_state:
     st.session_state["temp_payoff_date"] = datetime.today().date()
 
-st.markdown("""
-<style>
-/* Force Streamlit horizontal blocks (st.columns) to not wrap on narrow screens */
-div[data-testid="stHorizontalBlock"] {
-    flex-wrap: off;
-}
-</style>
-""", unsafe_allow_html=True)
-
-st.markdown("""
-<style>
-div[data-testid="stHorizontalBlock"] {
-    gap: 1px !important;
-}
-</style>
-""", unsafe_allow_html=True)
-
 # ─────────────────────────────────────────────────────────────────────────────
-# 2) (Optional) CSS for Minor Global Styling
+# 2) Custom CSS for Mobile–Optimized Layout
 # ─────────────────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-/* You can keep or adjust your global CSS as needed.
-   With native Streamlit containers, most styling is handled via st.columns. */
+/* Container for each line item */
+.line-item-container {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    background-color: #333;
+    padding: 4px;
+    border-radius: 4px;
+    margin: 4px auto;
+    max-width: 360px;
+    font-size: 12px;
+    font-family: sans-serif;
+}
+
+/* Prevent spans from wrapping */
+.line-item-container span {
+    white-space: nowrap;
+}
+
+/* Inline button styles */
+.line-item-button {
+    background-color: #555;
+    color: #fff;
+    border: none;
+    border-radius: 3px;
+    padding: 2px 4px;
+    font-size: 10px;
+    cursor: pointer;
+}
+.line-item-button.remove {
+    background-color: #900;
+}
+
+/* Metric boxes */
 .metric-box {
     background-color: #333;
     padding: 8px 10px;
@@ -100,6 +115,8 @@ st.markdown("""
     font-size: 12px;
     color: #fff;
 }
+
+/* Calendar container */
 .calendar-container {
     overflow-x: auto;
     max-width: 360px;
@@ -338,7 +355,7 @@ if "payoff" in params:
     st.experimental_rerun()
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 8) (Optional) CSS snippet for “➕” button styling remains unchanged
+# 8) CSS snippet for “➕” button styling (unchanged)
 # ─────────────────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
@@ -359,76 +376,72 @@ st.sidebar.title("Mielke Finances")
 page_choice = st.sidebar.radio("Navigation", ["Budget Planning", "Debt Domination", "Budget Overview"])
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Native Render Functions Using st.columns
+# Helper functions to render transaction and debt rows using inline HTML
 # ─────────────────────────────────────────────────────────────────────────────
-def render_transaction_row_native(row, color_class):
-    # Check if this row is in editing mode
-    is_editing = (st.session_state.get("editing_budget_item") == row["rowid"])
-    if is_editing:
-        # Create a row with separate columns for date and amount inputs, and Save/Cancel buttons
-        col_date, col_amount = st.columns([3, 2])
-        new_date = col_date.date_input("Date", value=row["date"], key=f"edit_date_{row['rowid']}")
-        new_amount = col_amount.number_input("Amount", value=float(row["amount"]), key=f"edit_amount_{row['rowid']}")
-        col_save, col_cancel = st.columns(2)
-        if col_save.button("Save", key=f"save_{row['rowid']}"):
-            update_fact_row(row["rowid"], new_date, new_amount)
-            st.session_state["editing_budget_item"] = None
-            st.experimental_rerun()
-        if col_cancel.button("Cancel", key=f"cancel_{row['rowid']}"):
-            st.session_state["editing_budget_item"] = None
-            st.experimental_rerun()
-    else:
-        # Display the row data in five columns: Date, Budget Item, Amount, Edit and Remove buttons
-        col_date, col_item, col_amount, col_edit, col_remove = st.columns([2, 4, 2, 1, 1])
-        col_date.write(row["date"].strftime("%Y-%m-%d"))
-        col_item.write(row["budget_item"])
-        col_amount.write(f"${row['amount']:,.2f}")
-        if col_edit.button("Edit", key=f"edit_{row['rowid']}"):
-            st.session_state["editing_budget_item"] = row["rowid"]
-            st.experimental_rerun()
-        if col_remove.button("❌", key=f"remove_{row['rowid']}"):
-            remove_fact_row(row["rowid"])
-            st.experimental_rerun()
+def render_transaction_row(row, color_class):
+    row_id = row["rowid"]
+    date_str = row["date"].strftime("%Y-%m-%d")
+    item_str = row["budget_item"]
+    amount_str = f"${row['amount']:,.2f}"
+    html = f"""
+    <div class="line-item-container">
+      <span style="color:#fff; font-weight:bold;">{date_str}</span>
+      <span style="color:#fff;">{item_str}</span>
+      <span style="color:{color_class};">{amount_str}</span>
+      <button class="line-item-button" onclick="window.location.href='?action=edit&rowid={row_id}'">Edit</button>
+      <button class="line-item-button remove" onclick="window.location.href='?action=remove&rowid={row_id}'">❌</button>
+    </div>
+    """
+    st.markdown(html, unsafe_allow_html=True)
 
-def render_debt_row_native(row):
-    # Check if this debt row is in editing mode
-    is_editing = (st.session_state.get("editing_debt_item") == row["rowid"])
-    if is_editing:
-        col_name, col_balance = st.columns([3, 2])
-        col_name.write(row["debt_name"])
-        new_balance = col_balance.number_input("New Balance", value=float(row["current_balance"]), key=f"edit_debt_balance_{row['rowid']}")
-        col_save, col_cancel = st.columns(2)
-        if col_save.button("Save", key=f"save_debt_{row['rowid']}"):
-            update_debt_item(row["rowid"], new_balance)
-            st.session_state["editing_debt_item"] = None
-            st.experimental_rerun()
-        if col_cancel.button("Cancel", key=f"cancel_debt_{row['rowid']}"):
-            st.session_state["editing_debt_item"] = None
-            st.experimental_rerun()
-    else:
-        # Display the debt row in columns: Name, Details, Balance, Edit, Payoff and Remove buttons
-        col_name, col_details, col_balance, col_edit, col_payoff, col_remove = st.columns([2, 3, 2, 1, 1, 1])
-        col_name.write(row["debt_name"])
-        due = row["due_date"] if row["due_date"] else "(None)"
-        min_pay = row["minimum_payment"] if pd.notnull(row["minimum_payment"]) else "(None)"
-        col_details.write(f"Due: {due}, Min: {min_pay}")
-        col_balance.write(f"${row['current_balance']:,.2f}")
-        if col_edit.button("Edit", key=f"edit_debt_{row['rowid']}"):
-            st.session_state["editing_debt_item"] = row["rowid"]
-            st.experimental_rerun()
-        # Use different button text based on whether a payoff plan exists
-        if row.get("payoff_plan_date"):
-            if col_payoff.button("Recalc", key=f"recalc_{row['rowid']}"):
-                st.session_state["active_payoff_plan"] = row["rowid"]
-                st.experimental_rerun()
-        else:
-            if col_payoff.button("Payoff", key=f"payoff_{row['rowid']}"):
-                st.session_state["active_payoff_plan"] = row["rowid"]
-                st.experimental_rerun()
-        if col_remove.button("❌", key=f"remove_debt_{row['rowid']}"):
-            remove_debt_item(row["rowid"])
-            remove_old_payoff_lines_for_debt(row["debt_name"])
-            st.experimental_rerun()
+def render_transaction_edit(row, color_class):
+    row_id = row["rowid"]
+    st.markdown(f"<div class='line-item-container' style='background-color:#444; color:#fff; font-weight:bold;'>Editing: {row['budget_item']} (${row['amount']:,.2f})</div>", unsafe_allow_html=True)
+    st.session_state["temp_budget_edit_date"] = st.date_input("Date", value=row["date"], key=f"edit_date_{row_id}")
+    st.session_state["temp_budget_edit_amount"] = st.number_input("Amount", min_value=0.0, format="%.2f",
+                                                                  value=float(row["amount"]), key=f"edit_amount_{row_id}")
+    col1, col2 = st.columns(2)
+    if col1.button("Save", key=f"save_{row_id}"):
+        update_fact_row(row_id, st.session_state["temp_budget_edit_date"],
+                        st.session_state["temp_budget_edit_amount"])
+        st.session_state["editing_budget_item"] = None
+        st.experimental_rerun()
+    if col2.button("Cancel", key=f"cancel_{row_id}"):
+        st.session_state["editing_budget_item"] = None
+        st.experimental_rerun()
+
+def render_debt_transaction_row(row):
+    row_id = row["rowid"]
+    name = row["debt_name"]
+    balance_str = f"${row['current_balance']:,.2f}"
+    due = row["due_date"] if row["due_date"] else "(None)"
+    min_pay = row["minimum_payment"] if pd.notnull(row["minimum_payment"]) else "(None)"
+    payoff_text = "Recalc" if row.get("payoff_plan_date") else "Payoff"
+    html = f"""
+    <div class="line-item-container">
+      <span style="color:#fff; font-weight:bold;">{name}</span>
+      <span style="color:#fff;">Due: {due}, Min: {min_pay}</span>
+      <span style="color:red;">{balance_str}</span>
+      <button class="line-item-button" onclick="window.location.href='?action=edit_debt&rowid={row_id}'">Edit</button>
+      <button class="line-item-button" onclick="window.location.href='?action=payoff&rowid={row_id}'">{payoff_text}</button>
+      <button class="line-item-button remove" onclick="window.location.href='?action=remove_debt&rowid={row_id}'">❌</button>
+    </div>
+    """
+    st.markdown(html, unsafe_allow_html=True)
+
+def render_debt_transaction_edit(row):
+    row_id = row["rowid"]
+    st.markdown(f"<div class='line-item-container' style='background-color:#444; color:#fff; font-weight:bold;'>Editing: {row['debt_name']}</div>", unsafe_allow_html=True)
+    st.session_state["temp_new_balance"] = st.number_input("New Balance", min_value=0.0, format="%.2f",
+                                                           value=float(row["current_balance"]), key=f"edit_debt_balance_{row_id}")
+    col1, col2 = st.columns(2)
+    if col1.button("Save", key=f"save_debt_{row_id}"):
+        update_debt_item(row_id, st.session_state["temp_new_balance"])
+        st.session_state["editing_debt_item"] = None
+        st.experimental_rerun()
+    if col2.button("Cancel", key=f"cancel_debt_{row_id}"):
+        st.session_state["editing_debt_item"] = None
+        st.experimental_rerun()
 
 # ─────────────────────────────────────────────────────────────────────────────
 # PAGE 1: Budget Planning
@@ -436,7 +449,8 @@ def render_debt_row_native(row):
 if page_choice == "Budget Planning":
     st.markdown("""
         <h1 style='text-align: center; font-size: 50px; font-weight: bold; 
-                   color: black; text-shadow: 0px 0px 10px #00ccff, 0px 0px 20px #00ccff;'>
+                   color: black; text-shadow: 0px 0px 10px #00ccff, 
+                                 0px 0px 20px #00ccff;'>
             Mielke Budget
         </h1>
     """, unsafe_allow_html=True)
@@ -491,7 +505,7 @@ if page_choice == "Budget Planning":
     </div>
     """, unsafe_allow_html=True)
 
-    # Build a day-grid calendar for the selected month (unchanged)
+    # Build a day-grid calendar for the selected month
     days_in_month = calendar.monthrange(current_year, current_month)[1]
     first_weekday = (calendar.monthrange(current_year, current_month)[0] + 1) % 7
     calendar_grid = [["" for _ in range(7)] for _ in range(6)]
@@ -624,21 +638,102 @@ if page_choice == "Budget Planning":
     if filtered_data.empty:
         st.write("No transactions found for this month.")
     else:
-        # Group transactions by category and use native containers to render each row
         inc_data = filtered_data[filtered_data["type"]=="income"]
         exp_data = filtered_data[filtered_data["type"]=="expense"]
 
+        def render_budget_row(row, color_class):
+            row_id = row["rowid"]
+            date_str = row["date"].strftime("%Y-%m-%d")
+            item_str = row["budget_item"]
+            amount_str = f"${row['amount']:,.2f}"
+            is_editing = (st.session_state["editing_budget_item"] == row_id)
+
+            main_bar_col, btns_col = st.columns([0.50, 0.10])
+
+            if is_editing:
+                with main_bar_col:
+                    st.markdown(f"""
+                    <div style="display:flex;align-items:center;background-color:#333;
+                                padding:8px;border-radius:5px;margin-bottom:4px;
+                                justify-content:space-between;">
+                        <div style="font-size:14px;font-weight:bold;color:#fff; min-width:80px;">
+                            Editing...
+                        </div>
+                        <div style="flex:1;margin-left:8px;color:#fff;font-size:14px;">
+                            {item_str}
+                        </div>
+                        <div style="font-size:14px;font-weight:bold;text-align:right;
+                                    min-width:60px;margin-left:8px;color:{color_class};">
+                            {amount_str}
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                    st.session_state["temp_budget_edit_date"] = st.date_input(
+                        "Date", value=row["date"], key=f"edit_date_{row_id}"
+                    )
+                    st.session_state["temp_budget_edit_amount"] = st.number_input(
+                        "Amount", min_value=0.0, format="%.2f", 
+                        value=float(row["amount"]), key=f"edit_amount_{row_id}"
+                    )
+
+                    sc1, sc2 = st.columns(2)
+                    if sc1.button("Save", key=f"save_{row_id}"):
+                        update_fact_row(
+                            row_id, 
+                            st.session_state["temp_budget_edit_date"],
+                            st.session_state["temp_budget_edit_amount"]
+                        )
+                        st.session_state["editing_budget_item"] = None
+                        st.experimental_rerun()
+                    if sc2.button("Cancel", key=f"cancel_{row_id}"):
+                        st.session_state["editing_budget_item"] = None
+                        st.experimental_rerun()
+
+                with btns_col:
+                    if st.button("❌", key=f"remove_{row_id}"):
+                        remove_fact_row(row_id)
+                        st.experimental_rerun()
+
+            else:
+                with main_bar_col:
+                    st.markdown(f"""
+                    <div style="display:flex;align-items:center;background-color:#333;
+                                padding:8px;border-radius:5px;margin-bottom:4px;
+                                justify-content:space-between;">
+                        <div style="font-size:14px;font-weight:bold;color:#fff; min-width:80px;">
+                            {date_str}
+                        </div>
+                        <div style="flex:1;margin-left:8px;color:#fff;font-size:14px;">
+                            {item_str}
+                        </div>
+                        <div style="font-size:14px;font-weight:bold;text-align:right;
+                                    min-width:60px;margin-left:8px;color:{color_class};">
+                            {amount_str}
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                with btns_col:
+                    e_col, x_col = st.columns(2)
+                    if e_col.button("Edit", key=f"editbtn_{row_id}"):
+                        st.session_state["editing_budget_item"] = row_id
+                        st.experimental_rerun()
+                    if x_col.button("❌", key=f"removebtn_{row_id}"):
+                        remove_fact_row(row_id)
+                        st.experimental_rerun()
+
         if not inc_data.empty:
             for cat_name, group_df in inc_data.groupby("category"):
-                st.markdown(f"### {cat_name}", unsafe_allow_html=True)
+                st.markdown(f"<div class='category-header'>{cat_name}</div>", unsafe_allow_html=True)
                 for _, row in group_df.iterrows():
-                    render_transaction_row_native(row, "#00cc00")
+                    render_budget_row(row, "#00cc00")
 
         if not exp_data.empty:
             for cat_name, group_df in exp_data.groupby("category"):
-                st.markdown(f"### {cat_name}", unsafe_allow_html=True)
+                st.markdown(f"<div class='category-header'>{cat_name}</div>", unsafe_allow_html=True)
                 for _, row in group_df.iterrows():
-                    render_transaction_row_native(row, "#ff4444")
+                    render_budget_row(row, "#ff4444")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # PAGE 2: Debt Domination
@@ -669,11 +764,114 @@ elif page_choice == "Debt Domination":
         st.write("No debt items found.")
     else:
         for idx, row in debt_df.iterrows():
-            render_debt_row_native(row)
+            row_id = row["rowid"]
+            row_name = row["debt_name"]
+            row_balance = row["current_balance"]
+            row_due = row["due_date"] if row["due_date"] else "(None)"
+            row_min = row["minimum_payment"] if pd.notnull(row["minimum_payment"]) else "(None)"
+            plan_date = row["payoff_plan_date"] if pd.notnull(row["payoff_plan_date"]) else None
+
+            is_editing = (st.session_state["editing_debt_item"] == row_id)
+
+            main_bar_col, btns_col = st.columns([0.70, 0.30])
+
+            if is_editing:
+                with main_bar_col:
+                    st.markdown(f"""
+                    <div style="display:flex;align-items:center;background-color:#333;
+                                padding:8px;border-radius:5px;margin-bottom:4px;
+                                justify-content:space-between;">
+                        <div style="font-size:14px; font-weight:bold; color:#fff; min-width:60px;">
+                            {row_name}
+                        </div>
+                        <div style="flex:1; margin-left:8px; color:#fff; font-size:14px;">
+                            Due: {row_due}, Min: {row_min}
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                    st.session_state["temp_new_balance"] = st.number_input(
+                        "New Balance",
+                        min_value=0.0,
+                        format="%.2f",
+                        key=f"edit_debt_balance_{row_id}",
+                        value=float(row_balance)
+                    )
+                    s_col, c_col = st.columns(2)
+                    if s_col.button("Save", key=f"save_debt_{row_id}"):
+                        update_debt_item(row_id, st.session_state["temp_new_balance"])
+                        st.session_state["editing_debt_item"] = None
+                        st.experimental_rerun()
+                    if c_col.button("Cancel", key=f"cancel_debt_{row_id}"):
+                        st.session_state["editing_debt_item"] = None
+                        st.experimental_rerun()
+
+                with btns_col:
+                    if st.button("❌", key=f"remove_debt_{row_id}"):
+                        remove_debt_item(row_id)
+                        remove_old_payoff_lines_for_debt(row_name)
+                        st.experimental_rerun()
+
+            else:
+                with main_bar_col:
+                    st.markdown(f"""
+                    <div style="display:flex;align-items:center;background-color:#333;
+                                padding:8px;border-radius:5px;margin-bottom:4px;
+                                justify-content:space-between;">
+                        <div style="font-size:14px; font-weight:bold; color:#fff; min-width:60px;">
+                            {row_name}
+                        </div>
+                        <div style="flex:1; margin-left:8px; color:#fff; font-size:14px;">
+                            Due: {row_due}, Min: {row_min}
+                        </div>
+                        <div style="font-size:14px; font-weight:bold; text-align:right;
+                                    min-width:60px; margin-left:8px; color:red;">
+                            ${row_balance:,.2f}
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                with btns_col:
+                    e_col, payoff_col, x_col = st.columns([0.25, 0.50, 0.25])
+                    edit_clicked = e_col.button("Edit", key=f"edit_debt_{row_id}")
+                    remove_clicked = x_col.button("❌", key=f"remove_btn_{row_id}")
+
+                    if plan_date:
+                        payoff_html = f"""
+                        <div style="text-align:center;">
+                            <a href="?recalc={row_id}" 
+                               style="display:inline-block; background-color:green; color:white; 
+                                      font-weight:bold; border-radius:5px; padding:4px 8px; 
+                                      text-decoration:none;">
+                                Recalc
+                            </a>
+                        </div>
+                        """
+                        payoff_col.markdown(payoff_html, unsafe_allow_html=True)
+                    else:
+                        payoff_html = f"""
+                        <div style="text-align:center;">
+                            <a href="?payoff={row_id}" 
+                               style="display:inline-block; background-color:yellow; color:black; 
+                                      font-weight:bold; border-radius:5px; padding:4px 8px; 
+                                      text-decoration:none;">
+                                Payoff
+                            </a>
+                        </div>
+                        """
+                        payoff_col.markdown(payoff_html, unsafe_allow_html=True)
+
+                    if edit_clicked:
+                        st.session_state["editing_debt_item"] = row_id
+                        st.experimental_rerun()
+                    if remove_clicked:
+                        remove_debt_item(row_id)
+                        remove_old_payoff_lines_for_debt(row_name)
+                        st.experimental_rerun()
 
     if st.session_state["active_payoff_plan"] is not None:
         reloaded_df = load_debt_items()
-        match = reloaded_df[reloaded_df["rowid"] == st.session_state["active_payoff_plan"]]
+        match = reloaded_df[reloaded_df["rowid"]==st.session_state["active_payoff_plan"]]
         if not match.empty:
             plan_data = match.iloc[0]
             plan_name = plan_data["debt_name"]
