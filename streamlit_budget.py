@@ -74,7 +74,8 @@ st.markdown("""
 <style>
 /* Container for each line item */
 .line-item-container {
-    align-items: left;
+    align-items: center;
+    flex-wrap: nowrap;
     gap: 2px;
     background-color: #333;
     padding: 4px;
