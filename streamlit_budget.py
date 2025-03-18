@@ -71,7 +71,7 @@ st.markdown("""
 <style>
 /* Force Streamlit horizontal blocks (st.columns) to not wrap on narrow screens */
 div[data-testid="stHorizontalBlock"] {
-    flex-wrap: nowrap;
+    flex-wrap: auto;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -79,7 +79,7 @@ div[data-testid="stHorizontalBlock"] {
 st.markdown("""
 <style>
 div[data-testid="stHorizontalBlock"] {
-    gap: .1px !important;
+    gap: 1px !important;
 }
 </style>
 """, unsafe_allow_html=True)
