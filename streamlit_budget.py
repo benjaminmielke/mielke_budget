@@ -455,6 +455,7 @@ page_choice = st.sidebar.radio("Navigation", ["Budget Planning", "Debt Dominatio
 # Helper functions to render transaction and debt rows using inline HTML
 # ─────────────────────────────────────────────────────────────────────────────
 def render_transaction_row(row, color_class):
+    """Render a transaction row with Edit and Delete buttons using HTML links."""
     row_id = row["rowid"]
     date_str = row["date"].strftime("%Y-%m-%d")
     item_str = row["budget_item"]
@@ -464,8 +465,8 @@ def render_transaction_row(row, color_class):
       <span style="color:#fff; font-weight:bold;">{date_str}</span>
       <span style="color:#fff;">{item_str}</span>
       <span style="color:{color_class};">{amount_str}</span>
-      <button class="line-item-button" onclick="window.location.href='?action=edit&rowid={row_id}'">Edit</button>
-      <button class="line-item-button remove" onclick="window.location.href='?action=remove&rowid={row_id}'">❌</button>
+      <a href="?action=edit&rowid={row_id}" class="line-item-button">Edit</a>
+      <a href="?action=remove&rowid={row_id}" class="line-item-button remove">❌</a>
     </div>
     """
     st.markdown(html, unsafe_allow_html=True)
@@ -487,20 +488,22 @@ def render_transaction_edit(row, color_class):
         st.experimental_rerun()
 
 def render_debt_transaction_row(row):
+    """Render a debt transaction row with Edit, Payoff/Recalc, and Delete buttons using HTML links."""
     row_id = row["rowid"]
     name = row["debt_name"]
     balance_str = f"${row['current_balance']:,.2f}"
     due = row["due_date"] if row["due_date"] else "(None)"
     min_pay = row["minimum_payment"] if pd.notnull(row["minimum_payment"]) else "(None)"
     payoff_text = "Recalc" if row.get("payoff_plan_date") else "Payoff"
+    payoff_action = "recalc" if row.get("payoff_plan_date") else "payoff"
     html = f"""
     <div class="line-item-container">
       <span style="color:#fff; font-weight:bold;">{name}</span>
       <span style="color:#fff;">Due: {due}, Min: {min_pay}</span>
       <span style="color:red;">{balance_str}</span>
-      <button class="line-item-button" onclick="window.location.href='?action=edit_debt&rowid={row_id}'">Edit</button>
-      <button class="line-item-button" onclick="window.location.href='?action=payoff&rowid={row_id}'">{payoff_text}</button>
-      <button class="line-item-button remove" onclick="window.location.href='?action=remove_debt&rowid={row_id}'">❌</button>
+      <a href="?action=edit_debt&rowid={row_id}" class="line-item-button">Edit</a>
+      <a href="?{payoff_action}={row_id}" class="line-item-button" style="background-color:{'green' if payoff_text=='Recalc' else 'yellow'}; color:{'white' if payoff_text=='Recalc' else 'black'};">{payoff_text}</a>
+      <a href="?action=remove_debt&rowid={row_id}" class="line-item-button remove">❌</a>
     </div>
     """
     st.markdown(html, unsafe_allow_html=True)
@@ -752,19 +755,8 @@ if page_choice == "Budget Planning":
                     st.session_state["editing_budget_item"] = None
                     st.rerun()
             else:
-                # Use the native render_transaction_row function
+                # Just use the existing render_transaction_row function
                 render_transaction_row(row, color_class)
-                
-                # Put Edit/Delete buttons below in small columns
-                col1, col2 = st.columns([0.5, 0.5])
-                with col1:
-                    if st.button("Edit", key=f"edit_{row_id}"):
-                        st.session_state["editing_budget_item"] = row_id
-                        st.rerun()
-                with col2:
-                    if st.button("Delete", key=f"delete_{row_id}"):
-                        remove_fact_row(row_id)
-                        st.rerun()
 
         # Display income transactions
         if not inc_data.empty:
