@@ -129,53 +129,63 @@ st.markdown("""
 }
 
 /* Mobile-optimized transaction rows */
-.mobile-row {
+/* Custom CSS for mobile-optimized layout */
+.transaction-row {
     display: flex;
-    flex-direction: row;
     align-items: center;
     background-color: #333;
+    padding: 6px 10px;
     border-radius: 5px;
-    padding: 8px;
     margin-bottom: 6px;
-    max-width: 100%;
+    width: 100%;
+    box-sizing: border-box;
 }
 
-.mobile-info {
-    display: flex;
+.transaction-info {
     flex-grow: 1;
+    display: flex;
+    align-items: center;
     overflow: hidden;
-    margin-right: 8px;
 }
 
-.mobile-date {
-    color: white;
+.transaction-date {
+    min-width: 80px;
+    font-size: 13px;
     font-weight: bold;
+    color: white;
     white-space: nowrap;
     margin-right: 8px;
-    min-width: 80px;
 }
 
-.mobile-name {
+.transaction-item {
+    flex: 1;
+    font-size: 13px;
     color: white;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    flex-grow: 1;
     margin-right: 8px;
 }
 
-.mobile-amount {
+.transaction-amount {
+    min-width: 60px;
+    font-size: 13px;
     font-weight: bold;
+    text-align: right;
     white-space: nowrap;
     margin-right: 8px;
 }
 
-.stButton > button {
+/* Make Streamlit buttons smaller and fit on one line */
+div[data-testid="stHorizontalBlock"] {
+    gap: 0.1rem !important;
+}
+
+div[data-testid="column"] button[kind="secondary"] {
+    padding: 0 4px !important;
+    min-height: 1.5rem !important;
     font-size: 12px !important;
-    height: auto !important;
-    padding: 2px 8px !important;
-    min-height: 0 !important;
-    line-height: 1.2 !important;
+    line-height: 0 !important;
 }
 
 .section-subheader {
@@ -742,32 +752,29 @@ if page_choice == "Budget Planning":
                     st.session_state["editing_budget_item"] = None
                     st.experimental_rerun()
             else:
-                # Create container for mobile-friendly display
-                budget_container = st.container()
-                
-                # Use columns for the container but with HTML for consistent layout
-                with budget_container:
-                    # Display the transaction info in HTML for consistent layout
-                    st.markdown(f"""
-                    <div class="mobile-row">
-                        <div class="mobile-info">
-                            <div class="mobile-date">{date_str}</div>
-                            <div class="mobile-name">{item_str}</div>
-                            <div class="mobile-amount" style="color:{color_class}">{amount_str}</div>
-                        </div>
+                # We'll use a custom layout with HTML and small embedded buttons
+                st.markdown(f"""
+                <div class="tx-row">
+                    <div class="tx-info">
+                        <div class="tx-date">{date_str}</div>
+                        <div class="tx-name">{item_str}</div>
+                        <div class="tx-amount" style="color:{color_class}">{amount_str}</div>
                     </div>
-                    """, unsafe_allow_html=True)
-                    
-                    # Use tiny columns for buttons to keep them on the same line
-                    col1, col2 = st.columns([0.5, 0.5])
-                    with col1:
-                        if st.button("Edit", key=f"edit_btn_{row_id}", help="Edit transaction"):
-                            st.session_state["editing_budget_item"] = row_id
-                            st.experimental_rerun()
-                    with col2:
-                        if st.button("❌", key=f"remove_btn_{row_id}", help="Delete transaction"):
-                            remove_fact_row(row_id)
-                            st.experimental_rerun()
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Buttons in their own columns for clean alignment
+                cols = st.columns([0.8, 0.1, 0.1])
+                with cols[0]:
+                    st.write("")  # Empty space
+                with cols[1]:
+                    if st.button("✏️", key=f"edit_btn_{row_id}", help="Edit"):
+                        st.session_state["editing_budget_item"] = row_id
+                        st.experimental_rerun()
+                with cols[2]:
+                    if st.button("❌", key=f"del_btn_{row_id}", help="Delete"):
+                        remove_fact_row(row_id)
+                        st.experimental_rerun()
 
         # Display income transactions
         if not inc_data.empty:
