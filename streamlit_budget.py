@@ -26,13 +26,20 @@ def get_query_params_fallback():
 def set_query_params_fallback(**kwargs):
     """
     Safely set query params:
-    - If st.set_query_params exists (newer Streamlit), use it.
-    - Else fallback to st.experimental_set_query_params (older Streamlit).
+    - If kwargs is empty, clears query parameters.
+    - Otherwise, uses st.set_query_params if available; else falls back to st.experimental_set_query_params.
     """
-    if hasattr(st, "set_query_params"):
-        st.set_query_params(**kwargs)
+    if not kwargs:
+        # Clear query parameters by passing an empty dict
+        if hasattr(st, "set_query_params"):
+            st.set_query_params({})
+        else:
+            st.experimental_set_query_params({})
     else:
-        st.experimental_set_query_params(**kwargs)
+        if hasattr(st, "set_query_params"):
+            st.set_query_params(**kwargs)
+        else:
+            st.experimental_set_query_params(**kwargs)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 1) Session State Initialization
@@ -217,14 +224,12 @@ def add_debt_item(debt_name, current_balance, due_date, min_payment):
     table_id = f"{PROJECT_ID}.{DATASET_ID}.{DEBT_TABLE_NAME}"
     if due_date == "(None)":
         due_date = None
-
     min_payment_val = None
     if min_payment.strip():
         try:
             min_payment_val = float(min_payment)
         except:
             min_payment_val = None
-
     df = pd.DataFrame([{
         "rowid": str(uuid.uuid4()),
         "debt_name": debt_name,
@@ -321,22 +326,21 @@ def insert_monthly_payments_for_debt(debt_name, total_balance, debt_due_date_str
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 7) Query Parameter Processing
-# ─────────────────────────────────────────────────────────────────────────────
 params = get_query_params_fallback()
-# New: Process swipe actions for edit or remove
+# Process swipe actions for edit or remove
 if "action" in params and "rowid" in params:
     action = params["action"][0] if isinstance(params["action"], list) else params["action"]
     row_id = params["rowid"][0] if isinstance(params["rowid"], list) else params["rowid"]
     if action == "remove":
         remove_fact_row(row_id)
-        set_query_params_fallback()
+        set_query_params_fallback()  # clear query params
         st.experimental_rerun()
     elif action == "edit":
         st.session_state["editing_budget_item"] = row_id
-        set_query_params_fallback()
+        set_query_params_fallback()  # clear query params
         st.experimental_rerun()
 
-# Existing processing for recalculation and payoff actions
+# Existing processing for recalc and payoff actions
 if "recalc" in params:
     row_id = params["recalc"]
     if isinstance(row_id, list):
@@ -363,7 +367,6 @@ if "payoff" in params:
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 8) CSS snippet for “➕” button styling (unchanged)
-# ─────────────────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
 button[data-baseweb="button"] div:contains("➕") {
@@ -378,7 +381,6 @@ button[data-baseweb="button"] div:contains("➕") {
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 9) Sidebar Navigation
-# ─────────────────────────────────────────────────────────────────────────────
 st.sidebar.title("Mielke Finances")
 page_choice = st.sidebar.radio("Navigation", ["Budget Planning", "Debt Domination", "Budget Overview"])
 
@@ -690,7 +692,7 @@ if page_choice == "Budget Planning":
     </div>
     """, unsafe_allow_html=True)
 
-    # Build day-grid calendar (unchanged)
+    # Build a day-grid calendar for the selected month
     days_in_month = calendar.monthrange(current_year, current_month)[1]
     first_weekday = (calendar.monthrange(current_year, current_month)[0] + 1) % 7
     calendar_grid = [["" for _ in range(7)] for _ in range(6)]
@@ -822,7 +824,6 @@ if page_choice == "Budget Planning":
     else:
         inc_data = filtered_data[filtered_data["type"]=="income"]
         exp_data = filtered_data[filtered_data["type"]=="expense"]
-
         # Use the swipeable row component for transactions
         if not inc_data.empty:
             for cat_name, group_df in inc_data.groupby("category"):
