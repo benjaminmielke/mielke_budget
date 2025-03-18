@@ -755,33 +755,34 @@ if page_choice == "Budget Planning":
                     st.session_state["editing_budget_item"] = None
                     st.rerun()
             else:
-                # Use flexbox layout to make everything on one line
-                row_container = st.container()
-                with row_container:
-                    # Create a 3-column layout - data, edit button, delete button
-                    data_col, edit_col, del_col = st.columns([0.9, 0.05, 0.05])
-                    
-                    # First column has the transaction data
-                    with data_col:
-                        st.markdown(f"""
-                        <div style="background-color:#333; padding:6px 10px; border-radius:5px; color:white; display:flex; align-items:center; justify-content:space-between; margin-bottom:2px;">
-                            <div style="min-width:85px; font-weight:bold; white-space:nowrap;">{date_str}</div>
-                            <div style="flex-grow:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin:0 10px;">{item_str}</div>
-                            <div style="color:{color_class}; font-weight:bold; text-align:right; min-width:60px;">{amount_str}</div>
-                        </div>
-                        """, unsafe_allow_html=True)
-                    
-                    # Second column has the edit button
-                    with edit_col:
-                        if st.button("✏️", key=f"edit_{row_id}", help="Edit"):
-                            st.session_state["editing_budget_item"] = row_id
-                            st.rerun()
-                    
-                    # Third column has the delete button
-                    with del_col:
-                        if st.button("❌", key=f"delete_{row_id}", help="Delete"):
-                            remove_fact_row(row_id)
-                            st.rerun()
+                # Create an invisible button that takes the full width of the row
+                # This makes the entire row clickable and triggers the edit function
+                st.markdown(f"""
+                <div style="position:relative; background-color:#333; padding:8px; 
+                            border-radius:5px; margin-bottom:5px; cursor:pointer;" 
+                     onclick="document.getElementById('edit_{row_id}').click();">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <div style="min-width:80px; color:white; font-weight:bold;">{date_str}</div>
+                        <div style="flex-grow:1; color:white; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{item_str}</div>
+                        <div style="min-width:60px; color:{color_class}; font-weight:bold; text-align:right;">{amount_str}</div>
+                    </div>
+                    <div style="position:absolute; top:8px; right:8px;">
+                        <span style="background:#555; color:white; padding:2px 4px; border-radius:3px; font-size:10px; margin-right:5px;">✏️</span>
+                        <span style="background:#900; color:white; padding:2px 4px; border-radius:3px; font-size:10px;">❌</span>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+                # Hidden buttons that actually handle the functionality
+                col1, col2 = st.columns([0.5, 0.5])
+                with col1:
+                    if st.button("", key=f"edit_{row_id}", help="Edit"):
+                        st.session_state["editing_budget_item"] = row_id
+                        st.rerun()
+                with col2:
+                    if st.button("", key=f"delete_{row_id}", help="Delete"):
+                        remove_fact_row(row_id)
+                        st.rerun()
 
         # Display income transactions
         if not inc_data.empty:
