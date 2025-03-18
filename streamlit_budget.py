@@ -77,7 +77,7 @@ st.markdown("""
     display: flex;
     align-items: center;
     gap: 2px;
-    background-color: #333;
+    background-color: #777;
     padding: 4px;
     border-radius: 4px;
     margin: 4px auto;
