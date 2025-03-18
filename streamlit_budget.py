@@ -785,17 +785,17 @@ if page_choice == "Budget Planning":
                     st.experimental_rerun()
                 st.markdown(html, unsafe_allow_html=True)
 
-        if not inc_data.empty:
-            for cat_name, group_df in inc_data.groupby("category"):
-                st.markdown(f"<div class='category-header'>{cat_name}</div>", unsafe_allow_html=True)
-                for _, row in group_df.iterrows():
-                    render_budget_row(row, "#00cc00")
+                    if not inc_data.empty:
+                for cat_name, group_df in inc_data.groupby("category"):
+                    st.markdown(f"<div class='category-header'>{cat_name}</div>", unsafe_allow_html=True)
+                    for _, row in group_df.iterrows():
+                        render_budget_row(row, "#00cc00")
 
-        if not exp_data.empty:
-            for cat_name, group_df in exp_data.groupby("category"):
-                st.markdown(f"<div class='category-header'>{cat_name}</div>", unsafe_allow_html=True)
-                for _, row in group_df.iterrows():
-                    render_budget_row(row, "#ff4444")
+            if not exp_data.empty:
+                for cat_name, group_df in exp_data.groupby("category"):
+                    st.markdown(f"<div class='category-header'>{cat_name}</div>", unsafe_allow_html=True)
+                    for _, row in group_df.iterrows():
+                        render_budget_row(row, "#ff4444")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # PAGE 2: Debt Domination
