@@ -698,7 +698,7 @@ if page_choice == "Budget Planning":
             else:
                 with main_bar_col:
                     st.markdown(f"""
-                    <div style="display:flex;align-items:center;background-color:#333;
+                    <div style="display:flex;align-items:center;background-color:#777;
                                 padding:8px;border-radius:5px;margin-bottom:4px;
                                 justify-content:space-between;">
                         <div style="font-size:14px;font-weight:bold;color:#fff; min-width:80px;">
