@@ -763,39 +763,53 @@ if page_choice == "Budget Planning":
                     st.session_state["editing_budget_item"] = None
                     st.experimental_rerun()
             else:
-                # Mobile-optimized single line layout
-                # This will replace our rendering with direct buttons
-                st.markdown(f"""
-                <div class="transaction-row">
-                    <div class="transaction-info">
-                        <div class="transaction-date">{date_str}</div>
-                        <div class="transaction-item">{item_str}</div>
-                        <div class="transaction-amount" style="color:{color_class}">{amount_str}</div>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
+                # Create a single row container with all elements
+                col1, col2 = st.columns([0.8, 0.2])
                 
-                # Use direct Streamlit buttons to handle the actions (this is more reliable)
-                e_col, x_col = st.columns([0.1, 0.1])
-                if e_col.button("Edit", key=f"editbtn_{row_id}"):
-                    st.session_state["editing_budget_item"] = row_id
-                    st.experimental_rerun()
-                if x_col.button("❌", key=f"removebtn_{row_id}"):
-                    remove_fact_row(row_id)
-                    st.experimental_rerun()
-                st.markdown(html, unsafe_allow_html=True)
+                with col1:
+                    # Transaction info
+                    st.markdown(f"""
+                    <div style="display:flex; align-items:center; background-color:#333; 
+                              padding:8px; border-radius:5px; margin-bottom:4px;">
+                        <div style="min-width:80px; font-size:14px; font-weight:bold; color:#fff;">
+                            {date_str}
+                        </div>
+                        <div style="flex:1; margin-left:4px; color:#fff; font-size:14px; 
+                                  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                            {item_str}
+                        </div>
+                        <div style="min-width:60px; margin-left:4px; font-size:14px; 
+                                  font-weight:bold; text-align:right; color:{color_class};">
+                            {amount_str}
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                with col2:
+                    # Action buttons
+                    btn_col1, btn_col2 = st.columns(2)
+                    
+                    if btn_col1.button("Edit", key=f"editbtn_{row_id}", help="Edit this transaction"):
+                        st.session_state["editing_budget_item"] = row_id
+                        st.experimental_rerun()
+                        
+                    if btn_col2.button("❌", key=f"removebtn_{row_id}", help="Delete this transaction"):
+                        remove_fact_row(row_id)
+                        st.experimental_rerun()
 
-                    if not inc_data.empty:
-                for cat_name, group_df in inc_data.groupby("category"):
-                    st.markdown(f"<div class='category-header'>{cat_name}</div>", unsafe_allow_html=True)
-                    for _, row in group_df.iterrows():
-                        render_budget_row(row, "#00cc00")
+        # Display income transactions
+        if not inc_data.empty:
+            for cat_name, group_df in inc_data.groupby("category"):
+                st.markdown(f"<div class='category-header'>{cat_name}</div>", unsafe_allow_html=True)
+                for _, row in group_df.iterrows():
+                    render_budget_row(row, "#00cc00")
 
-            if not exp_data.empty:
-                for cat_name, group_df in exp_data.groupby("category"):
-                    st.markdown(f"<div class='category-header'>{cat_name}</div>", unsafe_allow_html=True)
-                    for _, row in group_df.iterrows():
-                        render_budget_row(row, "#ff4444")
+        # Display expense transactions  
+        if not exp_data.empty:
+            for cat_name, group_df in exp_data.groupby("category"):
+                st.markdown(f"<div class='category-header'>{cat_name}</div>", unsafe_allow_html=True)
+                for _, row in group_df.iterrows():
+                    render_budget_row(row, "#ff4444")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # PAGE 2: Debt Domination
