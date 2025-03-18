@@ -132,75 +132,50 @@ st.markdown("""
 .mobile-row {
     display: flex;
     flex-direction: row;
-    justify-content: space-between;
     align-items: center;
     background-color: #333;
-    padding: 8px;
     border-radius: 5px;
-    margin-bottom: 5px;
-    width: 100%;
-    box-sizing: border-box;
+    padding: 8px;
+    margin-bottom: 6px;
+    max-width: 100%;
 }
 
 .mobile-info {
     display: flex;
-    flex-direction: row;
-    align-items: center;
     flex-grow: 1;
-    min-width: 0;
     overflow: hidden;
+    margin-right: 8px;
 }
 
 .mobile-date {
     color: white;
     font-weight: bold;
-    font-size: 13px;
-    margin-right: 8px;
     white-space: nowrap;
+    margin-right: 8px;
     min-width: 80px;
 }
 
 .mobile-name {
     color: white;
-    font-size: 13px;
-    flex-grow: 1;
+    white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap;
+    flex-grow: 1;
     margin-right: 8px;
 }
 
 .mobile-amount {
     font-weight: bold;
-    font-size: 13px;
     white-space: nowrap;
     margin-right: 8px;
 }
 
-.mobile-buttons {
-    display: flex;
-    flex-direction: row;
-    white-space: nowrap;
-    flex-shrink: 0;
-}
-
-.mobile-button {
-    padding: 3px 8px;
-    margin: 0 2px;
-    border-radius: 3px;
-    font-size: 11px;
-    color: white;
-    text-decoration: none;
-    display: inline-block;
-    text-align: center;
-}
-
-.mobile-edit {
-    background-color: #555;
-}
-
-.mobile-delete {
-    background-color: #900;
+.stButton > button {
+    font-size: 12px !important;
+    height: auto !important;
+    padding: 2px 8px !important;
+    min-height: 0 !important;
+    line-height: 1.2 !important;
 }
 
 .section-subheader {
@@ -418,41 +393,9 @@ def insert_monthly_payments_for_debt(debt_name, total_balance, debt_due_date_str
 # ─────────────────────────────────────────────────────────────────────────────
 # 7) Query Parameter Processing
 # ─────────────────────────────────────────────────────────────────────────────
+# Only process 'payoff' and 'recalc' query parameters
+# The other actions are now handled via session state
 params = get_query_params_fallback()
-
-# Handle edit and remove actions
-if "action" in params and "rowid" in params:
-    action = params["action"]
-    row_id = params["rowid"]
-    
-    if isinstance(action, list):
-        action = action[0]
-    if isinstance(row_id, list):
-        row_id = row_id[0]
-        
-    if action == "edit":
-        st.session_state["editing_budget_item"] = row_id
-        set_query_params_fallback()
-        st.experimental_rerun()
-    elif action == "remove":
-        remove_fact_row(row_id)
-        set_query_params_fallback()
-        st.experimental_rerun()
-    elif action == "edit_debt":
-        st.session_state["editing_debt_item"] = row_id
-        set_query_params_fallback()
-        st.experimental_rerun()
-    elif action == "remove_debt":
-        debt_df = load_debt_items()
-        match = debt_df[debt_df["rowid"] == row_id]
-        if not match.empty:
-            debt_name = match.iloc[0]["debt_name"]
-            remove_debt_item(row_id)
-            remove_old_payoff_lines_for_debt(debt_name)
-        set_query_params_fallback()
-        st.experimental_rerun()
-
-# Handle recalc and payoff actions
 if "recalc" in params:
     row_id = params["recalc"]
     if isinstance(row_id, list):
@@ -799,20 +742,32 @@ if page_choice == "Budget Planning":
                     st.session_state["editing_budget_item"] = None
                     st.experimental_rerun()
             else:
-                # Pure HTML approach for mobile-friendly single line
-                st.markdown(f"""
-                <div class="mobile-row">
-                    <div class="mobile-info">
-                        <div class="mobile-date">{date_str}</div>
-                        <div class="mobile-name">{item_str}</div>
-                        <div class="mobile-amount" style="color:{color_class}">{amount_str}</div>
+                # Create container for mobile-friendly display
+                budget_container = st.container()
+                
+                # Use columns for the container but with HTML for consistent layout
+                with budget_container:
+                    # Display the transaction info in HTML for consistent layout
+                    st.markdown(f"""
+                    <div class="mobile-row">
+                        <div class="mobile-info">
+                            <div class="mobile-date">{date_str}</div>
+                            <div class="mobile-name">{item_str}</div>
+                            <div class="mobile-amount" style="color:{color_class}">{amount_str}</div>
+                        </div>
                     </div>
-                    <div class="mobile-buttons">
-                        <a href="?action=edit&rowid={row_id}" class="mobile-button mobile-edit">Edit</a>
-                        <a href="?action=remove&rowid={row_id}" class="mobile-button mobile-delete">❌</a>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
+                    """, unsafe_allow_html=True)
+                    
+                    # Use tiny columns for buttons to keep them on the same line
+                    col1, col2 = st.columns([0.5, 0.5])
+                    with col1:
+                        if st.button("Edit", key=f"edit_btn_{row_id}", help="Edit transaction"):
+                            st.session_state["editing_budget_item"] = row_id
+                            st.experimental_rerun()
+                    with col2:
+                        if st.button("❌", key=f"remove_btn_{row_id}", help="Delete transaction"):
+                            remove_fact_row(row_id)
+                            st.experimental_rerun()
 
         # Display income transactions
         if not inc_data.empty:
@@ -889,23 +844,50 @@ elif page_choice == "Debt Domination":
                     st.session_state["editing_debt_item"] = None
                     st.experimental_rerun()
             else:
-                # Pure HTML approach for mobile-friendly single line debt rows
-                payoff_button = f"""<a href="?recalc={row_id}" class="mobile-button" style="background-color:green;">Recalc</a>""" if plan_date else f"""<a href="?payoff={row_id}" class="mobile-button" style="background-color:yellow; color:black;">Payoff</a>"""
+                # Create container for mobile-friendly display
+                debt_container = st.container()
                 
-                st.markdown(f"""
-                <div class="mobile-row">
-                    <div class="mobile-info">
-                        <div class="mobile-name" style="font-weight:bold;">{row_name}</div>
-                        <div class="mobile-name">Due: {row_due}, Min: {row_min}</div>
-                        <div class="mobile-amount" style="color:red;">${row_balance:,.2f}</div>
+                # Use columns for the container but with HTML for consistent layout
+                with debt_container:
+                    # Display the debt info in HTML for consistent layout
+                    st.markdown(f"""
+                    <div class="mobile-row">
+                        <div class="mobile-info">
+                            <div class="mobile-name" style="font-weight:bold;">{row_name}</div>
+                            <div class="mobile-name">Due: {row_due}, Min: {row_min}</div>
+                            <div class="mobile-amount" style="color:red;">${row_balance:,.2f}</div>
+                        </div>
                     </div>
-                    <div class="mobile-buttons">
-                        <a href="?action=edit_debt&rowid={row_id}" class="mobile-button mobile-edit">Edit</a>
-                        {payoff_button}
-                        <a href="?action=remove_debt&rowid={row_id}" class="mobile-button mobile-delete">❌</a>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
+                    """, unsafe_allow_html=True)
+                    
+                    # Use tiny columns for buttons to keep them on the same line
+                    col1, col2, col3 = st.columns([0.33, 0.34, 0.33])
+                    with col1:
+                        if st.button("Edit", key=f"edit_debt_btn_{row_id}", help="Edit debt"):
+                            st.session_state["editing_debt_item"] = row_id
+                            st.experimental_rerun()
+                    with col2:
+                        if plan_date:
+                            if st.button("Recalc", key=f"recalc_btn_{row_id}", help="Recalculate payoff plan"):
+                                reloaded_df = load_debt_items()
+                                match = reloaded_df[reloaded_df["rowid"] == row_id]
+                                if not match.empty:
+                                    plan_data = match.iloc[0]
+                                    plan_name = plan_data["debt_name"]
+                                    plan_balance = plan_data["current_balance"]
+                                    plan_due = plan_data["due_date"] if plan_data["due_date"] else ""
+                                    plan_existing = plan_data["payoff_plan_date"] if plan_data["payoff_plan_date"] else datetime.today().date()
+                                    insert_monthly_payments_for_debt(plan_name, plan_balance, plan_due, plan_existing)
+                                st.experimental_rerun()
+                        else:
+                            if st.button("Payoff", key=f"payoff_btn_{row_id}", help="Create payoff plan"):
+                                st.session_state["active_payoff_plan"] = row_id
+                                st.experimental_rerun()
+                    with col3:
+                        if st.button("❌", key=f"remove_debt_btn_{row_id}", help="Delete debt"):
+                            remove_debt_item(row_id)
+                            remove_old_payoff_lines_for_debt(row_name)
+                            st.experimental_rerun()
 
     if st.session_state["active_payoff_plan"] is not None:
         reloaded_df = load_debt_items()
