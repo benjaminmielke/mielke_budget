@@ -764,19 +764,25 @@ if page_choice == "Budget Planning":
                     st.experimental_rerun()
             else:
                 # Mobile-optimized single line layout
-                html = f"""
+                # This will replace our rendering with direct buttons
+                st.markdown(f"""
                 <div class="transaction-row">
                     <div class="transaction-info">
                         <div class="transaction-date">{date_str}</div>
                         <div class="transaction-item">{item_str}</div>
                         <div class="transaction-amount" style="color:{color_class}">{amount_str}</div>
                     </div>
-                    <div class="transaction-buttons">
-                        <button class="btn-small btn-edit" onclick="window.location.href='?action=edit&rowid={row_id}'">Edit</button>
-                        <button class="btn-small btn-delete" onclick="window.location.href='?action=remove&rowid={row_id}'">❌</button>
-                    </div>
                 </div>
-                """
+                """, unsafe_allow_html=True)
+                
+                # Use direct Streamlit buttons to handle the actions (this is more reliable)
+                e_col, x_col = st.columns([0.1, 0.1])
+                if e_col.button("Edit", key=f"editbtn_{row_id}"):
+                    st.session_state["editing_budget_item"] = row_id
+                    st.experimental_rerun()
+                if x_col.button("❌", key=f"removebtn_{row_id}"):
+                    remove_fact_row(row_id)
+                    st.experimental_rerun()
                 st.markdown(html, unsafe_allow_html=True)
 
         if not inc_data.empty:
