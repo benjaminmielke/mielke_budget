@@ -755,8 +755,33 @@ if page_choice == "Budget Planning":
                     st.session_state["editing_budget_item"] = None
                     st.rerun()
             else:
-                # Just use the existing render_transaction_row function
-                render_transaction_row(row, color_class)
+                # Use flexbox layout to make everything on one line
+                row_container = st.container()
+                with row_container:
+                    # Create a 3-column layout - data, edit button, delete button
+                    data_col, edit_col, del_col = st.columns([0.9, 0.05, 0.05])
+                    
+                    # First column has the transaction data
+                    with data_col:
+                        st.markdown(f"""
+                        <div style="background-color:#333; padding:6px 10px; border-radius:5px; color:white; display:flex; align-items:center; justify-content:space-between; margin-bottom:2px;">
+                            <div style="min-width:85px; font-weight:bold; white-space:nowrap;">{date_str}</div>
+                            <div style="flex-grow:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin:0 10px;">{item_str}</div>
+                            <div style="color:{color_class}; font-weight:bold; text-align:right; min-width:60px;">{amount_str}</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    
+                    # Second column has the edit button
+                    with edit_col:
+                        if st.button("✏️", key=f"edit_{row_id}", help="Edit"):
+                            st.session_state["editing_budget_item"] = row_id
+                            st.rerun()
+                    
+                    # Third column has the delete button
+                    with del_col:
+                        if st.button("❌", key=f"delete_{row_id}", help="Delete"):
+                            remove_fact_row(row_id)
+                            st.rerun()
 
         # Display income transactions
         if not inc_data.empty:
