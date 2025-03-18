@@ -420,7 +420,7 @@ if "recalc" in params:
         plan_existing = plan_data["payoff_plan_date"] if plan_data["payoff_plan_date"] else datetime.today().date()
         insert_monthly_payments_for_debt(plan_name, plan_balance, plan_due, plan_existing)
     set_query_params_fallback()
-    st.experimental_rerun()
+    st.rerun()
 
 if "payoff" in params:
     row_id = params["payoff"]
@@ -747,34 +747,24 @@ if page_choice == "Budget Planning":
                         st.session_state["temp_budget_edit_amount"]
                     )
                     st.session_state["editing_budget_item"] = None
-                    st.experimental_rerun()
+                    st.rerun()
                 if sc2.button("Cancel", key=f"cancel_{row_id}"):
                     st.session_state["editing_budget_item"] = None
-                    st.experimental_rerun()
+                    st.rerun()
             else:
-                # We'll use a custom layout with HTML and small embedded buttons
-                st.markdown(f"""
-                <div class="tx-row">
-                    <div class="tx-info">
-                        <div class="tx-date">{date_str}</div>
-                        <div class="tx-name">{item_str}</div>
-                        <div class="tx-amount" style="color:{color_class}">{amount_str}</div>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
+                # Use the native render_transaction_row function
+                render_transaction_row(row, color_class)
                 
-                # Buttons in their own columns for clean alignment
-                cols = st.columns([0.8, 0.1, 0.1])
-                with cols[0]:
-                    st.write("")  # Empty space
-                with cols[1]:
-                    if st.button("✏️", key=f"edit_btn_{row_id}", help="Edit"):
+                # Put Edit/Delete buttons below in small columns
+                col1, col2 = st.columns([0.5, 0.5])
+                with col1:
+                    if st.button("Edit", key=f"edit_{row_id}"):
                         st.session_state["editing_budget_item"] = row_id
-                        st.experimental_rerun()
-                with cols[2]:
-                    if st.button("❌", key=f"del_btn_{row_id}", help="Delete"):
+                        st.rerun()
+                with col2:
+                    if st.button("Delete", key=f"delete_{row_id}"):
                         remove_fact_row(row_id)
-                        st.experimental_rerun()
+                        st.rerun()
 
         # Display income transactions
         if not inc_data.empty:
