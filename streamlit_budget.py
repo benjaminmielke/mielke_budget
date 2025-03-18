@@ -77,6 +77,14 @@ div[data-testid="stHorizontalBlock"] {
 </style>
 """, unsafe_allow_html=True)
 
+st.markdown("""
+<style>
+div[data-testid="stHorizontalBlock"] {
+    gap: 2px !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
 # ─────────────────────────────────────────────────────────────────────────────
 # 2) (Optional) CSS for Minor Global Styling
 # ─────────────────────────────────────────────────────────────────────────────
