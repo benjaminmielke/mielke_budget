@@ -145,13 +145,13 @@ st.markdown("""
 /* Calendar container */
 .calendar-container {
     overflow-x: auto;
-    max-width: 360px;
+    max-width: 90%;
     margin: auto;
 }
 .calendar-container table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 10px;
+    font-size: 12px;
 }
 </style>
 """, unsafe_allow_html=True)
