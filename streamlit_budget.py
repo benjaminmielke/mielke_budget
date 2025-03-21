@@ -698,66 +698,6 @@ def render_budget_row(row, color_class):
                 remove_fact_row(row_id)
                 rerun_fallback()
 
-    else:
-        with main_bar_col:
-            st.markdown(f"""
-            <div class="budget-row-container">
-                <div class="budget-row-date">
-                    {date_str}
-                </div>
-                <div class="budget-row-item">
-                    {item_str}
-                </div>
-                <div class="budget-row-amount" style="color:{color_class};">
-                    {amount_str}
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-
-        with btns_col:
-            # Using a container div to ensure proper spacing
-            st.markdown("""
-            <div style="display: flex; justify-content: space-between; gap: 5px;">
-                <div style="flex: 1;"></div>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            # Place buttons with better styling
-            if st.button("Edit", key=f"editbtn_{row_id}", use_container_width=True):
-                st.session_state["editing_budget_item"] = row_id
-                rerun_fallback()
-            if st.button("❌", key=f"removebtn_{row_id}", use_container_width=True):
-                remove_fact_row(row_id)
-                rerun_fallback()
-
-    else:
-        with main_bar_col:
-            st.markdown(f"""
-            <div style="display:flex;align-items:center;background-color:#333;
-                        padding:8px;border-radius:5px;margin-bottom:4px;
-                        justify-content:space-between;">
-                <div style="font-size:14px;font-weight:bold;color:#fff; min-width:80px;">
-                    {date_str}
-                </div>
-                <div style="flex:1;margin-left:8px;color:#fff;font-size:14px;">
-                    {item_str}
-                </div>
-                <div style="font-size:14px;font-weight:bold;text-align:right;
-                            min-width:60px;margin-left:8px;color:{color_class};">
-                    {amount_str}
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-
-        with btns_col:
-            e_col, x_col = st.columns(2)
-            if e_col.button("Edit", key=f"editbtn_{row_id}"):
-                st.session_state["editing_budget_item"] = row_id
-                rerun_fallback()
-            if x_col.button("❌", key=f"removebtn_{row_id}"):
-                remove_fact_row(row_id)
-                rerun_fallback()
-
 # ─────────────────────────────────────────────────────────────────────────────
 # PAGE 1: Budget Planning
 # ─────────────────────────────────────────────────────────────────────────────
