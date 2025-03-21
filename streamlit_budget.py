@@ -9,55 +9,55 @@ import uuid
 from dateutil.relativedelta import relativedelta
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 0) Query Parameter Fallback Functions & Rerun Fallback
+# 0) Query Parameter and Rerun Fallback Functions
 # ─────────────────────────────────────────────────────────────────────────────
 def get_query_params_fallback():
     """
-    Safely read query params regardless of Streamlit version
+    Safely read query params:
+    - If st.query_params exists (newer Streamlit), use it.
+    - Else fallback to st.experimental_get_query_params (older Streamlit).
+    
+    Returns a dict-like object that can be accessed with standard
+    dictionary syntax.
     """
-    try:
-        # Try the new way first
-        if hasattr(st, "query_params"):
-            return dict(st.query_params)
-        # Fall back to the old way
+    if hasattr(st, "query_params"):
+        # Convert to dict to ensure consistent behavior
+        return dict(st.query_params)
+    else:
         return st.experimental_get_query_params()
-    except:
-        # Return empty dict if both fail
-        return {}
 
 def set_query_params_fallback(**kwargs):
     """
-    Safely set query params regardless of Streamlit version
+    Safely set query params:
+    - If st.query_params.update exists (newest Streamlit), use it.
+    - Else if st.query_params exists (newer Streamlit), manually set.
+    - Else fallback to st.experimental_set_query_params (older Streamlit).
     """
-    try:
-        # Try the new way first (1.32+)
-        if hasattr(st, "query_params") and hasattr(st.query_params, "update"):
-            st.query_params.update(**kwargs)
-        # Try the intermediate way next
-        elif hasattr(st, "query_params"):
-            for key, value in kwargs.items():
-                st.query_params[key] = value
-        # Fall back to the old way
-        else:
-            st.experimental_set_query_params(**kwargs)
-    except:
-        # If all fail, just pass (don't break the app)
-        pass
+    if hasattr(st, "query_params") and hasattr(st.query_params, "update"):
+        # Newest API (Streamlit 1.32+)
+        st.query_params.update(**kwargs)
+    elif hasattr(st, "query_params"):
+        # Newer API but without update method
+        # Clear existing params then set new ones
+        current_params = dict(st.query_params)
+        for key in list(current_params.keys()):
+            del st.query_params[key]
+        for key, value in kwargs.items():
+            st.query_params[key] = value
+    else:
+        # Legacy API
+        st.experimental_set_query_params(**kwargs)
 
 def rerun_fallback():
     """
-    Safely rerun the app regardless of Streamlit version
+    Safely rerun the app:
+    - If st.rerun exists (newer Streamlit), use it.
+    - Else fallback to st.experimental_rerun (older Streamlit).
     """
-    try:
-        # Try the new way first
-        if hasattr(st, "rerun"):
-            st.rerun()
-        # Fall back to the old way
-        else:
-            st.experimental_rerun()
-    except:
-        # If both fail, use stop as last resort
-        st.stop()
+    if hasattr(st, "rerun"):
+        st.rerun()
+    else:
+        st.experimental_rerun()
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 1) Session State Initialization
@@ -145,52 +145,13 @@ st.markdown("""
 /* Calendar container */
 .calendar-container {
     overflow-x: auto;
-    max-width: 90%;
-    margin: 20px auto;
-    background-color: #2c2c2c;
-    border-radius: 10px;
-    padding: 15px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    max-width: 360px;
+    margin: auto;
 }
 .calendar-container table {
     width: 100%;
-    border-collapse: separate;
-    border-spacing: 3px;
-    font-size: 12px;
-}
-.calendar-container th {
-    background-color: #4a89dc;
-    color: white;
-    padding: 8px;
-    border-radius: 5px;
-    font-weight: bold;
-    text-align: center;
-}
-.calendar-container td {
-    background-color: #333;
-    border-radius: 5px;
-    padding: 8px;
-    vertical-align: top;
-    min-height: 80px;
-    text-align: left;
-    color: white;
-    transition: background-color 0.2s;
-}
-.calendar-container td:hover {
-    background-color: #444;
-}
-.calendar-container td strong {
-    display: block;
-    text-align: right;
-    margin-bottom: 5px;
-    font-size: 14px;
-    color: #ddd;
-}
-.calendar-container td span {
-    display: block;
-    padding: 2px 0;
-    border-radius: 3px;
-    margin: 2px 0;
+    border-collapse: collapse;
+    font-size: 10px;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -395,59 +356,29 @@ def insert_monthly_payments_for_debt(debt_name, total_balance, debt_due_date_str
 # 7) Query Parameter Processing
 # ─────────────────────────────────────────────────────────────────────────────
 params = get_query_params_fallback()
-
-# Process action query parameters
-if "action" in params:
-    action = params.get("action", [""])[0] if isinstance(params.get("action", []), list) else params.get("action", "")
-    row_id = params.get("rowid", [""])[0] if isinstance(params.get("rowid", []), list) else params.get("rowid", "")
-    
-    if action == "edit" and row_id:
-        st.session_state["editing_budget_item"] = row_id
-    elif action == "remove" and row_id:
-        remove_fact_row(row_id)
-    elif action == "edit_debt" and row_id:
-        st.session_state["editing_debt_item"] = row_id
-    elif action == "remove_debt" and row_id:
-        debt_df = load_debt_items()
-        match = debt_df[debt_df["rowid"] == row_id]
-        if not match.empty:
-            debt_name = match.iloc[0]["debt_name"]
-            remove_debt_item(row_id)
-            remove_old_payoff_lines_for_debt(debt_name)
-
 if "recalc" in params:
-    row_id = params.get("recalc", [""])[0] if isinstance(params.get("recalc", []), list) else params.get("recalc", "")
-    if row_id:
-        reloaded_df = load_debt_items()
-        match = reloaded_df[reloaded_df["rowid"] == row_id]
-        if not match.empty:
-            plan_data = match.iloc[0]
-            plan_name = plan_data["debt_name"]
-            plan_balance = plan_data["current_balance"]
-            plan_due = plan_data["due_date"] if plan_data["due_date"] else ""
-            plan_existing = plan_data["payoff_plan_date"] if plan_data["payoff_plan_date"] else datetime.today().date()
-            insert_monthly_payments_for_debt(plan_name, plan_balance, plan_due, plan_existing)
+    row_id = params["recalc"]
+    if isinstance(row_id, list):
+        row_id = row_id[0]
+    reloaded_df = load_debt_items()
+    match = reloaded_df[reloaded_df["rowid"] == row_id]
+    if not match.empty:
+        plan_data = match.iloc[0]
+        plan_name = plan_data["debt_name"]
+        plan_balance = plan_data["current_balance"]
+        plan_due = plan_data["due_date"] if plan_data["due_date"] else ""
+        plan_existing = plan_data["payoff_plan_date"] if plan_data["payoff_plan_date"] else datetime.today().date()
+        insert_monthly_payments_for_debt(plan_name, plan_balance, plan_due, plan_existing)
+    set_query_params_fallback()
+    rerun_fallback()
 
 if "payoff" in params:
-    row_id = params.get("payoff", [""])[0] if isinstance(params.get("payoff", []), list) else params.get("payoff", "")
-    if row_id:
-        st.session_state["active_payoff_plan"] = row_id
-
-# Clear query parameters if any were processed
-if params:
-    try:
-        # Try the cleanest way first (new API)
-        if hasattr(st, "query_params") and hasattr(st.query_params, "clear"):
-            st.query_params.clear()
-        # Alternative approach
-        elif hasattr(st, "query_params"):
-            for key in list(st.query_params.keys()):
-                del st.query_params[key]
-        # Legacy approach
-        else:
-            set_query_params_fallback()
-    except:
-        pass  # Don't break if this fails
+    row_id = params["payoff"]
+    if isinstance(row_id, list):
+        row_id = row_id[0]
+    st.session_state["active_payoff_plan"] = row_id
+    set_query_params_fallback()
+    rerun_fallback()
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 8) CSS snippet for "➕" button styling (unchanged)
@@ -512,20 +443,13 @@ def render_debt_transaction_row(row):
     due = row["due_date"] if row["due_date"] else "(None)"
     min_pay = row["minimum_payment"] if pd.notnull(row["minimum_payment"]) else "(None)"
     payoff_text = "Recalc" if row.get("payoff_plan_date") else "Payoff"
-    
-    # Use form submission instead of direct query params for better compatibility
-    if payoff_text == "Recalc":
-        payoff_url = f"?recalc={row_id}"
-    else:
-        payoff_url = f"?payoff={row_id}"
-        
     html = f"""
     <div class="line-item-container">
       <span style="color:#fff; font-weight:bold;">{name}</span>
       <span style="color:#fff;">Due: {due}, Min: {min_pay}</span>
       <span style="color:red;">{balance_str}</span>
       <button class="line-item-button" onclick="window.location.href='?action=edit_debt&rowid={row_id}'">Edit</button>
-      <button class="line-item-button" onclick="window.location.href='{payoff_url}'">{payoff_text}</button>
+      <button class="line-item-button" onclick="window.location.href='?payoff={row_id}'">{payoff_text}</button>
       <button class="line-item-button remove" onclick="window.location.href='?action=remove_debt&rowid={row_id}'">❌</button>
     </div>
     """
@@ -546,7 +470,7 @@ def render_debt_transaction_edit(row):
         rerun_fallback()
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Updated render_budget_row
+# Updated render_budget_row with try/except blocks for rerun
 # ─────────────────────────────────────────────────────────────────────────────
 def render_budget_row(row, color_class):
     row_id = row["rowid"]
@@ -941,19 +865,30 @@ elif page_choice == "Debt Domination":
                     edit_clicked = e_col.button("Edit", key=f"edit_debt_{row_id}")
                     remove_clicked = x_col.button("❌", key=f"remove_btn_{row_id}")
 
-                    # Use buttons directly for payoff actions instead of HTML links
                     if plan_date:
-                        if payoff_col.button("Recalc", key=f"recalc_{row_id}"):
-                            plan_name = row["debt_name"]
-                            plan_balance = row["current_balance"]
-                            plan_due = row["due_date"] if row["due_date"] else ""
-                            plan_existing = row["payoff_plan_date"] if row["payoff_plan_date"] else datetime.today().date()
-                            insert_monthly_payments_for_debt(plan_name, plan_balance, plan_due, plan_existing)
-                            rerun_fallback()
+                        payoff_html = f"""
+                        <div style="text-align:center;">
+                            <a href="?recalc={row_id}" 
+                               style="display:inline-block; background-color:green; color:white; 
+                                      font-weight:bold; border-radius:5px; padding:4px 8px; 
+                                      text-decoration:none;">
+                                Recalc
+                            </a>
+                        </div>
+                        """
+                        payoff_col.markdown(payoff_html, unsafe_allow_html=True)
                     else:
-                        if payoff_col.button("Payoff", key=f"payoff_{row_id}"):
-                            st.session_state["active_payoff_plan"] = row_id
-                            rerun_fallback()
+                        payoff_html = f"""
+                        <div style="text-align:center;">
+                            <a href="?payoff={row_id}" 
+                               style="display:inline-block; background-color:yellow; color:black; 
+                                      font-weight:bold; border-radius:5px; padding:4px 8px; 
+                                      text-decoration:none;">
+                                Payoff
+                            </a>
+                        </div>
+                        """
+                        payoff_col.markdown(payoff_html, unsafe_allow_html=True)
 
                     if edit_clicked:
                         st.session_state["editing_debt_item"] = row_id
