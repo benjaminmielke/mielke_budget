@@ -361,6 +361,106 @@ button[data-baseweb="button"] div:contains("➕") {
     margin: 10px 0;
     width: 100%;
 }
+
+
+/* Tightened input field styling */
+.transaction-form-container {
+    /* Keep existing styles */
+    background-color: #2c2c2c;
+    border-radius: 10px;
+    padding: 15px;
+    margin: 15px auto;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    max-width: 95%;
+}
+
+/* Reduce spacing between form elements */
+.transaction-form-container [data-testid="stVerticalBlock"] > div {
+    padding-bottom: 0.5rem !important;
+    margin-bottom: 0 !important;
+}
+
+/* Compact form labels */
+.transaction-form-container label {
+    color: #ddd !important;
+    font-weight: 500;
+    font-size: 0.9rem !important;
+    margin-bottom: 0.1rem !important;
+    padding-bottom: 0 !important;
+}
+
+/* Reduce input field padding */
+.transaction-form-container input,
+.transaction-form-container select,
+.transaction-form-container textarea,
+.transaction-form-container .stDateInput > div {
+    padding: 0.25rem 0.5rem !important;
+    min-height: 1.8rem !important;
+    line-height: 1.2 !important;
+    font-size: 0.9rem !important;
+}
+
+/* Make dropdown menus more compact */
+.transaction-form-container [data-baseweb="select"] {
+    font-size: 0.9rem !important;
+}
+
+.transaction-form-container [data-baseweb="select"] > div {
+    min-height: 1.8rem !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+}
+
+/* Reduce height of date picker */
+.transaction-form-container .stDateInput > div {
+    height: 1.8rem !important;
+}
+
+/* Compress height of number inputs */
+.transaction-form-container [data-testid="stNumberInput"] input {
+    height: 1.8rem !important;
+}
+
+/* Reduce text area height */
+.transaction-form-container textarea {
+    min-height: 5rem !important;
+}
+
+/* Adjust form column spacing */
+.transaction-form-container [data-testid="column"] {
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+}
+
+/* First column label alignment */
+.transaction-form-container [data-testid="column"]:first-child {
+    display: flex;
+    align-items: center;
+}
+
+/* Tighten row spacing between form sections */
+.transaction-form-container [data-testid="stHorizontalBlock"] {
+    margin-bottom: 0.5rem !important;
+    padding-bottom: 0 !important;
+}
+
+/* Ensure form field widths are filled appropriately */
+.transaction-form-container [data-testid="column"] > div {
+    width: 100% !important;
+}
+
+/* Adjust spacing for the plus button */
+.transaction-form-container [data-testid="column"] button[data-baseweb="button"] {
+    margin-top: 0.2rem !important;
+}
+
+/* Make the form divider less prominent */
+.form-divider {
+    background-color: #444;
+    height: 1px;
+    margin: 0.5rem 0;
+    width: 100%;
+}
 </style>
 """, unsafe_allow_html=True)
 
