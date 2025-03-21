@@ -894,7 +894,7 @@ elif page_choice == "Debt Domination":
 
             is_editing = (st.session_state["editing_debt_item"] == row_id)
 
-            main_bar_col, btns_col = st.columns([0.70, 0.30])
+            main_bar_col, btns_col = st.columns([0.65, 0.35])
 
             if is_editing:
                 with main_bar_col:
@@ -953,7 +953,7 @@ elif page_choice == "Debt Domination":
                     """, unsafe_allow_html=True)
 
                 with btns_col:
-                    e_col, payoff_col, x_col = st.columns([0.25, 0.50, 0.25])
+                    e_col, payoff_col, x_col = st.columns([0.30, 0.50, 0.20])
                     edit_clicked = e_col.button("Edit", key=f"edit_debt_{row_id}")
                     remove_clicked = x_col.button("❌", key=f"remove_btn_{row_id}")
 
