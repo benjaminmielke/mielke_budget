@@ -116,7 +116,6 @@ st.markdown("""
     font-size: 12px;
     color: #fff;
 }
-/* Updated calendar container styling for computer screen friendly formatting */
 .calendar-container {
     overflow-x: auto;
     max-width: 800px;
@@ -452,180 +451,6 @@ def render_debt_transaction_edit(row):
         st.experimental_rerun()
 
 # ─────────────────────────────────────────────────────────────────────────────
-# New: Swipeable Transaction Row Component
-def render_swipe_transaction_row(row, color_class):
-    """
-    Render a transaction row that supports swipe gestures.
-    Swiping right (diff > 50px) triggers an edit.
-    Swiping left (diff < -50px) triggers a delete.
-    """
-    row_id = row["rowid"]
-    date_str = row["date"].strftime("%Y-%m-%d")
-    item_str = row["budget_item"]
-    amount_str = f"${row['amount']:,.2f}"
-    html_code = f"""
-    <html>
-    <head>
-      <style>
-         body {{
-            margin: 0;
-            padding: 0;
-         }}
-         .swipe-container {{
-            width: 100%;
-            max-width: 360px;
-            background-color: #333;
-            color: #fff;
-            font-family: sans-serif;
-            font-size: 12px;
-            padding: 4px;
-            border-radius: 4px;
-            overflow: hidden;
-            position: relative;
-         }}
-         .swipe-content {{
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            transition: transform 0.3s ease;
-         }}
-         .swipe-content span {{
-            white-space: nowrap;
-            margin-right: 4px;
-         }}
-      </style>
-    </head>
-    <body>
-      <div id="swipeContainer" class="swipe-container">
-         <div id="swipeContent" class="swipe-content">
-            <span style="font-weight:bold;">{date_str}</span>
-            <span>{item_str}</span>
-            <span style="color:{color_class};">{amount_str}</span>
-         </div>
-      </div>
-      <script>
-         var swipeContainer = document.getElementById('swipeContainer');
-         var swipeContent = document.getElementById('swipeContent');
-         var startX = 0;
-         swipeContainer.addEventListener('touchstart', function(e) {{
-            startX = e.touches[0].clientX;
-         }});
-         swipeContainer.addEventListener('touchmove', function(e) {{
-            var currentX = e.touches[0].clientX;
-            var diff = currentX - startX;
-            swipeContent.style.transform = 'translateX(' + diff + 'px)';
-         }});
-         swipeContainer.addEventListener('touchend', function(e) {{
-            var diff = e.changedTouches[0].clientX - startX;
-            if (diff > 50) {{
-                // Right swipe: trigger edit action
-                window.location.href = '?action=edit&rowid={row_id}';
-            }} else if (diff < -50) {{
-                // Left swipe: trigger delete action
-                window.location.href = '?action=remove&rowid={row_id}';
-            }} else {{
-                swipeContent.style.transform = 'translateX(0px)';
-            }}
-         }});
-      </script>
-    </body>
-    </html>
-    """
-    components.html(html_code, height=80, scrolling=False)
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Updated render_budget_row with try/except blocks for st.experimental_rerun()
-def render_budget_row(row, color_class):
-    row_id = row["rowid"]
-    date_str = row["date"].strftime("%Y-%m-%d")
-    item_str = row["budget_item"]
-    amount_str = f"${row['amount']:,.2f}"
-    is_editing = (st.session_state["editing_budget_item"] == row_id)
-    main_bar_col, btns_col = st.columns([0.50, 0.10])
-    if is_editing:
-        with main_bar_col:
-            st.markdown(f"""
-            <div style="display:flex;align-items:center;background-color:#333;
-                        padding:8px;border-radius:5px;margin-bottom:4px;
-                        justify-content:space-between;">
-                <div style="font-size:14px;font-weight:bold;color:#fff; min-width:80px;">
-                    Editing...
-                </div>
-                <div style="flex:1;margin-left:8px;color:#fff;font-size:14px;">
-                    {item_str}
-                </div>
-                <div style="font-size:14px;font-weight:bold;text-align:right;
-                            min-width:60px;margin-left:8px;color:{color_class};">
-                    {amount_str}
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-            st.session_state["temp_budget_edit_date"] = st.date_input(
-                "Date", value=row["date"], key=f"edit_date_{row_id}"
-            )
-            st.session_state["temp_budget_edit_amount"] = st.number_input(
-                "Amount", min_value=0.0, format="%.2f", 
-                value=float(row["amount"]), key=f"edit_amount_{row_id}"
-            )
-            sc1, sc2 = st.columns(2)
-            if sc1.button("Save", key=f"save_{row_id}"):
-                update_fact_row(
-                    row_id, 
-                    st.session_state["temp_budget_edit_date"],
-                    st.session_state["temp_budget_edit_amount"]
-                )
-                st.session_state["editing_budget_item"] = None
-                try:
-                    st.experimental_rerun()
-                except AttributeError:
-                    st.stop()
-            if sc2.button("Cancel", key=f"cancel_{row_id}"):
-                st.session_state["editing_budget_item"] = None
-                try:
-                    st.experimental_rerun()
-                except AttributeError:
-                    st.stop()
-        with btns_col:
-            if st.button("❌", key=f"remove_{row_id}"):
-                remove_fact_row(row_id)
-                try:
-                    st.experimental_rerun()
-                except AttributeError:
-                    st.stop()
-    else:
-        with main_bar_col:
-            st.markdown(f"""
-            <div style="display:flex;align-items:center;background-color:#333;
-                        padding:8px;border-radius:5px;margin-bottom:4px;
-                        justify-content:space-between;">
-                <div style="font-size:14px;font-weight:bold;color:#fff; min-width:80px;">
-                    {date_str}
-                </div>
-                <div style="flex:1;margin-left:8px;color:#fff;font-size:14px;">
-                    {item_str}
-                </div>
-                <div style="font-size:14px;font-weight:bold;text-align:right;
-                            min-width:60px;margin-left:8px;color:{color_class};">
-                    {amount_str}
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-        with btns_col:
-            e_col, x_col = st.columns(2)
-            if e_col.button("Edit", key=f"editbtn_{row_id}"):
-                st.session_state["editing_budget_item"] = row_id
-                try:
-                    st.experimental_rerun()
-                except AttributeError:
-                    st.stop()
-            if x_col.button("❌", key=f"removebtn_{row_id}"):
-                remove_fact_row(row_id)
-                try:
-                    st.experimental_rerun()
-                except AttributeError:
-                    st.stop()
-
-# ─────────────────────────────────────────────────────────────────────────────
 # PAGE 1: Budget Planning
 if page_choice == "Budget Planning":
     st.markdown("""
@@ -798,17 +623,16 @@ if page_choice == "Budget Planning":
     else:
         inc_data = filtered_data[filtered_data["type"]=="income"]
         exp_data = filtered_data[filtered_data["type"]=="expense"]
-        # Use the swipeable row component for transactions
         if not inc_data.empty:
             for cat_name, group_df in inc_data.groupby("category"):
                 st.markdown(f"<div class='category-header'>{cat_name}</div>", unsafe_allow_html=True)
                 for _, row in group_df.iterrows():
-                    render_swipe_transaction_row(row, "#00cc00")
+                    render_transaction_row(row, "#00cc00")
         if not exp_data.empty:
             for cat_name, group_df in exp_data.groupby("category"):
                 st.markdown(f"<div class='category-header'>{cat_name}</div>", unsafe_allow_html=True)
                 for _, row in group_df.iterrows():
-                    render_swipe_transaction_row(row, "#ff4444")
+                    render_transaction_row(row, "#ff4444")
 elif page_choice == "Debt Domination":
     st.markdown("""
         <h1 style='text-align: center; font-size: 50px; font-weight: bold; color: black;
