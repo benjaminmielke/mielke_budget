@@ -6,6 +6,7 @@ from datetime import datetime, date
 import os
 import calendar
 import uuid
+import time
 from dateutil.relativedelta import relativedelta
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -145,13 +146,52 @@ st.markdown("""
 /* Calendar container */
 .calendar-container {
     overflow-x: auto;
-    max-width: 360px;
-    margin: auto;
+    max-width: 90%;
+    margin: 20px auto;
+    background-color: #2c2c2c;
+    border-radius: 10px;
+    padding: 15px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
 }
 .calendar-container table {
     width: 100%;
-    border-collapse: collapse;
-    font-size: 10px;
+    border-collapse: separate;
+    border-spacing: 3px;
+    font-size: 12px;
+}
+.calendar-container th {
+    background-color: #4a89dc;
+    color: white;
+    padding: 8px;
+    border-radius: 5px;
+    font-weight: bold;
+    text-align: center;
+}
+.calendar-container td {
+    background-color: #333;
+    border-radius: 5px;
+    padding: 8px;
+    vertical-align: top;
+    min-height: 80px;
+    text-align: left;
+    color: white;
+    transition: background-color 0.2s;
+}
+.calendar-container td:hover {
+    background-color: #444;
+}
+.calendar-container td strong {
+    display: block;
+    text-align: right;
+    margin-bottom: 5px;
+    font-size: 14px;
+    color: #ddd;
+}
+.calendar-container td span {
+    display: block;
+    padding: 2px 0;
+    border-radius: 3px;
+    margin: 2px 0;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -198,16 +238,52 @@ def add_dimension_row(type_val, category_val, budget_item_val):
 # 5) Fact Table Functions (Budget Planning)
 # ─────────────────────────────────────────────────────────────────────────────
 def load_fact_data():
-    query = f"SELECT * FROM `{PROJECT_ID}.{DATASET_ID}.{FACT_TABLE_NAME}`"
-    df = client.query(query).to_dataframe()
-    df['date'] = pd.to_datetime(df['date'])
-    return df
+    """
+    Load transaction data with improved error handling
+    """
+    try:
+        query = f"SELECT * FROM `{PROJECT_ID}.{DATASET_ID}.{FACT_TABLE_NAME}`"
+        df = client.query(query).to_dataframe()
+        
+        # Ensure date column is properly formatted
+        if 'date' in df.columns:
+            df['date'] = pd.to_datetime(df['date'], errors='coerce')
+            
+        # Handle any missing values
+        if 'amount' in df.columns:
+            df['amount'] = df['amount'].fillna(0.0)
+            
+        return df
+    except Exception as e:
+        st.error(f"Error loading transaction data: {str(e)}")
+        # Return empty dataframe with expected columns
+        return pd.DataFrame(columns=['rowid', 'date', 'type', 'amount', 'category', 'budget_item', 'credit_card', 'note'])
 
 def save_fact_data(rows_df):
-    table_id = f"{PROJECT_ID}.{DATASET_ID}.{FACT_TABLE_NAME}"
-    job = client.load_table_from_dataframe(rows_df, table_id,
-        job_config=bigquery.LoadJobConfig(write_disposition="WRITE_APPEND"))
-    job.result()
+    """
+    Saves transaction data to the fact table with improved error handling
+    """
+    try:
+        table_id = f"{PROJECT_ID}.{DATASET_ID}.{FACT_TABLE_NAME}"
+        # Ensure date is in the correct format
+        if 'date' in rows_df.columns and not pd.api.types.is_datetime64_any_dtype(rows_df['date']):
+            rows_df['date'] = pd.to_datetime(rows_df['date'])
+            
+        # Ensure numeric columns are correct type
+        if 'amount' in rows_df.columns:
+            rows_df['amount'] = pd.to_numeric(rows_df['amount'], errors='coerce')
+            
+        job_config = bigquery.LoadJobConfig(
+            write_disposition="WRITE_APPEND",
+            schema_update_options=[bigquery.SchemaUpdateOption.ALLOW_FIELD_ADDITION]
+        )
+        
+        job = client.load_table_from_dataframe(rows_df, table_id, job_config=job_config)
+        job.result()  # Wait for the job to complete
+        return True
+    except Exception as e:
+        st.error(f"Error saving data: {str(e)}")
+        return False
 
 def remove_fact_row(row_id):
     query = f"""
@@ -472,25 +548,62 @@ def render_debt_transaction_row(row):
     balance_str = f"${row['current_balance']:,.2f}"
     due = row["due_date"] if row["due_date"] else "(None)"
     min_pay = row["minimum_payment"] if pd.notnull(row["minimum_payment"]) else "(None)"
-    payoff_text = "Recalc" if row.get("payoff_plan_date") else "Payoff"
+    plan_date = row.get("payoff_plan_date")
     
-    # Use form submission instead of direct query params for better compatibility
-    if payoff_text == "Recalc":
-        payoff_url = f"?recalc={row_id}"
-    else:
-        payoff_url = f"?payoff={row_id}"
-        
-    html = f"""
-    <div class="line-item-container">
+    # The top part of the line item remains the same
+    main_text = f"""
+    <div class="line-item-container" style="margin-bottom:0; border-bottom-left-radius:0; border-bottom-right-radius:0;">
       <span style="color:#fff; font-weight:bold;">{name}</span>
       <span style="color:#fff;">Due: {due}, Min: {min_pay}</span>
       <span style="color:red;">{balance_str}</span>
       <button class="line-item-button" onclick="window.location.href='?action=edit_debt&rowid={row_id}'">Edit</button>
-      <button class="line-item-button" onclick="window.location.href='{payoff_url}'">{payoff_text}</button>
       <button class="line-item-button remove" onclick="window.location.href='?action=remove_debt&rowid={row_id}'">❌</button>
     </div>
     """
-    st.markdown(html, unsafe_allow_html=True)
+    st.markdown(main_text, unsafe_allow_html=True)
+    
+    # Add a separate row just for the payoff button using native Streamlit buttons
+    payoff_container = f"""
+    <div style="display:flex; justify-content:center; background-color:#333; 
+                max-width:360px; margin:0 auto; padding:4px; 
+                border-bottom-left-radius:4px; border-bottom-right-radius:4px;">
+    </div>
+    """
+    st.markdown(payoff_container, unsafe_allow_html=True)
+    
+    # Use a native Streamlit button for payoff functionality
+    if plan_date:
+        if st.button("Recalculate Payment Plan", key=f"recalc_btn_{row_id}"):
+            # Process recalc action
+            reloaded_df = load_debt_items()
+            match = reloaded_df[reloaded_df["rowid"] == row_id]
+            if not match.empty:
+                plan_data = match.iloc[0]
+                plan_name = plan_data["debt_name"]
+                plan_balance = plan_data["current_balance"]
+                plan_due = plan_data["due_date"] if plan_data["due_date"] else ""
+                plan_existing = plan_data["payoff_plan_date"] if plan_data["payoff_plan_date"] else datetime.today().date()
+                insert_monthly_payments_for_debt(plan_name, plan_balance, plan_due, plan_existing)
+                st.success("Payment plan recalculated!")
+                st.markdown("""
+                <script>
+                setTimeout(function() {
+                    window.location.reload();
+                }, 1000);
+                </script>
+                """, unsafe_allow_html=True)
+    else:
+        if st.button("Create Payoff Plan", key=f"payoff_btn_{row_id}"):
+            # Process payoff action
+            st.session_state["active_payoff_plan"] = row_id
+            st.success("Opening payoff plan configuration...")
+            st.markdown("""
+            <script>
+            setTimeout(function() {
+                window.location.reload();
+            }, 500);
+            </script>
+            """, unsafe_allow_html=True)
 
 def render_debt_transaction_edit(row):
     row_id = row["rowid"]
@@ -553,7 +666,16 @@ def render_budget_row(row, color_class):
                     st.session_state["temp_budget_edit_amount"]
                 )
                 st.session_state["editing_budget_item"] = None
-                rerun_fallback()
+                st.markdown("""
+                <script>
+                setTimeout(function() {
+                    window.location.reload();
+                }, 500);
+                </script>
+                """, unsafe_allow_html=True)
+                st.success("Updated successfully!")
+                time.sleep(0.5)
+                
             if sc2.button("Cancel", key=f"cancel_{row_id}"):
                 st.session_state["editing_budget_item"] = None
                 rerun_fallback()
@@ -561,7 +683,15 @@ def render_budget_row(row, color_class):
         with btns_col:
             if st.button("❌", key=f"remove_{row_id}"):
                 remove_fact_row(row_id)
-                rerun_fallback()
+                st.markdown("""
+                <script>
+                setTimeout(function() {
+                    window.location.reload();
+                }, 500);
+                </script>
+                """, unsafe_allow_html=True)
+                st.success("Deleted successfully!")
+                time.sleep(0.5)
 
     else:
         with main_bar_col:
@@ -589,7 +719,15 @@ def render_budget_row(row, color_class):
                 rerun_fallback()
             if x_col.button("❌", key=f"removebtn_{row_id}"):
                 remove_fact_row(row_id)
-                rerun_fallback()
+                st.markdown("""
+                <script>
+                setTimeout(function() {
+                    window.location.reload();
+                }, 500);
+                </script>
+                """, unsafe_allow_html=True)
+                st.success("Deleted successfully!")
+                time.sleep(0.5)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # PAGE 1: Budget Planning
@@ -767,19 +905,38 @@ if page_choice == "Budget Planning":
     cX, cY = st.columns([1,3])
     with cY:
         if st.button("Add Transaction"):
-            row_id = str(uuid.uuid4())
-            tx_df = pd.DataFrame([{
-                "rowid": row_id,
-                "date": date_input,
-                "type": type_input,
-                "amount": amount_input,
-                "category": category_input,
-                "budget_item": budget_item_input,
-                "credit_card": None,
-                "note": note_input
-            }])
-            save_fact_data(tx_df)
-            rerun_fallback()
+            with st.spinner("Saving transaction..."):
+                # Validate inputs
+                if not budget_item_input or budget_item_input == "(No items yet)":
+                    st.error("Please select a valid budget item")
+                elif amount_input <= 0:
+                    st.error("Amount must be greater than zero")
+                else:
+                    row_id = str(uuid.uuid4())
+                    tx_df = pd.DataFrame([{
+                        "rowid": row_id,
+                        "date": date_input,
+                        "type": type_input,
+                        "amount": amount_input,
+                        "category": category_input,
+                        "budget_item": budget_item_input,
+                        "credit_card": None,
+                        "note": note_input
+                    }])
+                    
+                    success = save_fact_data(tx_df)
+                    if success:
+                        st.success("Transaction added successfully!")
+                        # Use JavaScript to reload the page after a short delay
+                        st.markdown("""
+                        <script>
+                        setTimeout(function() {
+                            window.location.reload();
+                        }, 1000);
+                        </script>
+                        """, unsafe_allow_html=True)
+                    else:
+                        st.error("Failed to add transaction. Please try again.")
 
     st.markdown("<div class='section-subheader'>Transactions This Month</div>", unsafe_allow_html=True)
 
