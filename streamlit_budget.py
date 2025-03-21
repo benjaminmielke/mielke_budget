@@ -286,6 +286,81 @@ st.markdown("""
 .category-header .category-total {
     font-weight: bold;
 }
+
+
+/* Transaction form styling */
+.transaction-form-container {
+    background-color: #2c2c2c;
+    border-radius: 10px;
+    padding: 15px;
+    margin: 15px auto;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    max-width: 95%;
+}
+
+.transaction-form-title {
+    color: #4a89dc;
+    font-size: 18px;
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #444;
+}
+
+/* Style for form row labels */
+.transaction-form-container label {
+    color: #ddd !important;
+    font-weight: 500;
+}
+
+/* Style for input fields */
+.transaction-form-container input[type="text"],
+.transaction-form-container input[type="number"],
+.transaction-form-container textarea,
+.transaction-form-container select,
+.transaction-form-container .stDateInput input {
+    background-color: #333 !important;
+    border: 1px solid #555 !important;
+    border-radius: 5px !important;
+    color: #fff !important;
+    padding: 8px !important;
+}
+
+/* Style for the Add Transaction button */
+.transaction-form-container .stButton button {
+    background-color: #4a89dc !important;
+    color: white !important;
+    font-weight: bold !important;
+    border: none !important;
+    border-radius: 5px !important;
+    padding: 10px 20px !important;
+    width: 100% !important;
+    transition: all 0.3s ease !important;
+}
+
+.transaction-form-container .stButton button:hover {
+    background-color: #3a79cc !important;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Update the plus button styling */
+button[data-baseweb="button"] div:contains("➕") {
+    background-color: #4a89dc !important;  /* Matching blue color */
+    color: white !important;
+    font-weight: bold !important;
+    border-radius: 50% !important;
+    padding: 2px 8px !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3) !important;
+}
+
+/* Styling for form section dividers */
+.form-divider {
+    background-color: #444;
+    height: 1px;
+    margin: 10px 0;
+    width: 100%;
+}
 </style>
 """, unsafe_allow_html=True)
 
