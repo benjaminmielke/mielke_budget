@@ -138,20 +138,29 @@ st.markdown("""
     cursor: pointer;
     white-space: nowrap; /* Prevent button text from wrapping */
     flex-shrink: 0; /* Don't shrink buttons */
+    min-width: 30px; /* Ensure minimum width for buttons */
 }
 .line-item-button.remove {
     background-color: #900;
 }
 
-/* Metric boxes */
+/* Metric boxes - UPDATED: increased size */
 .metric-box {
     background-color: #333;
-    padding: 8px 10px;
+    padding: 12px 15px;  /* Increased padding */
     border-radius: 8px;
-    margin: 2px;
+    margin: 4px;  /* Slightly larger margin */
     text-align: center;
-    font-size: 12px;
+    font-size: 14px;  /* Larger font size */
     color: #fff;
+    min-width: 120px;  /* Minimum width for metric boxes */
+}
+
+/* Value text in metric boxes - make it larger */
+.metric-box div:last-child {
+    font-size: 18px;  /* Larger font for the value */
+    font-weight: bold;
+    margin-top: 5px;
 }
 
 /* Calendar container */
@@ -203,6 +212,56 @@ st.markdown("""
     padding: 2px 0;
     border-radius: 3px;
     margin: 2px 0;
+}
+
+/* Updated budget row styling for better button spacing */
+.budget-row-container {
+    display: flex;
+    align-items: center;
+    background-color: #333;
+    padding: 8px;
+    border-radius: 5px;
+    margin-bottom: 4px;
+    justify-content: space-between;
+    max-width: 100%;
+}
+
+.budget-row-date {
+    font-size: 14px;
+    font-weight: bold;
+    color: #fff;
+    min-width: 80px;
+    flex-shrink: 0;
+}
+
+.budget-row-item {
+    flex: 1;
+    margin-left: 8px;
+    color: #fff;
+    font-size: 14px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.budget-row-amount {
+    font-size: 14px;
+    font-weight: bold;
+    text-align: right;
+    min-width: 70px;
+    margin-left: 8px;
+    flex-shrink: 0;
+}
+
+/* Fix for the buttons column to prevent wrapping */
+.budget-buttons-column {
+    min-width: 80px !important;  /* Ensures enough space for buttons */
+    padding-left: 5px;
+}
+
+.edit-button, .remove-button {
+    min-width: 30px;
+    text-align: center;
 }
 </style>
 """, unsafe_allow_html=True)
