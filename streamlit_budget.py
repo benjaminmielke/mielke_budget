@@ -34,6 +34,13 @@ def set_query_params_fallback(**kwargs):
         st.experimental_set_query_params(**kwargs)
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Helper function for rerun: call experimental_rerun then stop execution
+# ─────────────────────────────────────────────────────────────────────────────
+def do_rerun():
+    st.experimental_rerun()
+    st.stop()
+
+# ─────────────────────────────────────────────────────────────────────────────
 # 1) Session State Initialization
 # ─────────────────────────────────────────────────────────────────────────────
 if "show_new_category_form" not in st.session_state:
@@ -344,7 +351,7 @@ if "recalc" in params:
         plan_existing = plan_data["payoff_plan_date"] if plan_data["payoff_plan_date"] else datetime.today().date()
         insert_monthly_payments_for_debt(plan_name, plan_balance, plan_due, plan_existing)
     set_query_params_fallback()
-    st.experimental_rerun()
+    do_rerun()
 
 if "payoff" in params:
     row_id = params["payoff"]
@@ -352,7 +359,7 @@ if "payoff" in params:
         row_id = row_id[0]
     st.session_state["active_payoff_plan"] = row_id
     set_query_params_fallback()
-    st.experimental_rerun()
+    do_rerun()
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 8) CSS snippet for “➕” button styling (unchanged)
@@ -405,10 +412,10 @@ def render_transaction_edit(row, color_class):
         update_fact_row(row_id, st.session_state["temp_budget_edit_date"],
                         st.session_state["temp_budget_edit_amount"])
         st.session_state["editing_budget_item"] = None
-        st.experimental_rerun()
+        do_rerun()
     if col2.button("Cancel", key=f"cancel_{row_id}"):
         st.session_state["editing_budget_item"] = None
-        st.experimental_rerun()
+        do_rerun()
 
 def render_debt_transaction_row(row):
     row_id = row["rowid"]
@@ -438,10 +445,10 @@ def render_debt_transaction_edit(row):
     if col1.button("Save", key=f"save_debt_{row_id}"):
         update_debt_item(row_id, st.session_state["temp_new_balance"])
         st.session_state["editing_debt_item"] = None
-        st.experimental_rerun()
+        do_rerun()
     if col2.button("Cancel", key=f"cancel_debt_{row_id}"):
         st.session_state["editing_debt_item"] = None
-        st.experimental_rerun()
+        do_rerun()
 
 # ─────────────────────────────────────────────────────────────────────────────
 # PAGE 1: Budget Planning
@@ -467,7 +474,7 @@ if page_choice == "Budget Planning":
                 st.session_state["current_year"] -= 1
             else:
                 st.session_state["current_month"] -= 1
-            st.experimental_rerun()
+            do_rerun()
     with col_next:
         if st.button("Next Month"):
             if current_month == 12:
@@ -475,7 +482,7 @@ if page_choice == "Budget Planning":
                 st.session_state["current_year"] += 1
             else:
                 st.session_state["current_month"] += 1
-            st.experimental_rerun()
+            do_rerun()
 
     fact_data = load_fact_data()
     fact_data.sort_values("date", ascending=True, inplace=True)
@@ -568,10 +575,11 @@ if page_choice == "Budget Planning":
                 add_dimension_row(type_input, new_cat, "")
             st.session_state["show_new_category_form"] = False
             st.session_state["temp_new_category"] = ""
-            st.experimental_rerun()
+            do_rerun()
         if cc2.button("Cancel"):
             st.session_state["show_new_category_form"] = False
             st.session_state["temp_new_category"] = ""
+            do_rerun()
 
     items_for_cat = dimension_df[dimension_df["category"]==category_input]["budget_item"].unique()
     items_for_cat = [i for i in items_for_cat if i!=""]
@@ -599,10 +607,11 @@ if page_choice == "Budget Planning":
                 add_dimension_row(type_input, category_input, new_item)
             st.session_state["show_new_item_form"] = False
             st.session_state["temp_new_item"] = ""
-            st.experimental_rerun()
+            do_rerun()
         if ic2.button("Cancel"):
             st.session_state["show_new_item_form"] = False
             st.session_state["temp_new_item"] = ""
+            do_rerun()
 
     cA, cB = st.columns([1,3])
     with cA:
@@ -631,7 +640,7 @@ if page_choice == "Budget Planning":
                 "note": note_input
             }])
             save_fact_data(tx_df)
-            st.experimental_rerun()
+            do_rerun()
 
     st.markdown("<div class='section-subheader'>Transactions This Month</div>", unsafe_allow_html=True)
 
@@ -669,31 +678,23 @@ if page_choice == "Budget Planning":
                     </div>
                     """, unsafe_allow_html=True)
 
-                    st.session_state["temp_budget_edit_date"] = st.date_input(
-                        "Date", value=row["date"], key=f"edit_date_{row_id}"
-                    )
-                    st.session_state["temp_budget_edit_amount"] = st.number_input(
-                        "Amount", min_value=0.0, format="%.2f", 
-                        value=float(row["amount"]), key=f"edit_amount_{row_id}"
-                    )
-
+                    st.session_state["temp_budget_edit_date"] = st.date_input("Date", value=row["date"], key=f"edit_date_{row_id}")
+                    st.session_state["temp_budget_edit_amount"] = st.number_input("Amount", min_value=0.0, format="%.2f",
+                                                                                  value=float(row["amount"]), key=f"edit_amount_{row_id}")
                     sc1, sc2 = st.columns(2)
                     if sc1.button("Save", key=f"save_{row_id}"):
-                        update_fact_row(
-                            row_id, 
-                            st.session_state["temp_budget_edit_date"],
-                            st.session_state["temp_budget_edit_amount"]
-                        )
+                        update_fact_row(row_id, st.session_state["temp_budget_edit_date"],
+                                        st.session_state["temp_budget_edit_amount"])
                         st.session_state["editing_budget_item"] = None
-                        st.experimental_rerun()
+                        do_rerun()
                     if sc2.button("Cancel", key=f"cancel_{row_id}"):
                         st.session_state["editing_budget_item"] = None
-                        st.experimental_rerun()
+                        do_rerun()
 
                 with btns_col:
                     if st.button("❌", key=f"remove_{row_id}"):
                         remove_fact_row(row_id)
-                        st.experimental_rerun()
+                        do_rerun()
 
             else:
                 with main_bar_col:
@@ -718,10 +719,10 @@ if page_choice == "Budget Planning":
                     e_col, x_col = st.columns(2)
                     if e_col.button("Edit", key=f"editbtn_{row_id}"):
                         st.session_state["editing_budget_item"] = row_id
-                        st.experimental_rerun()
+                        do_rerun()
                     if x_col.button("❌", key=f"removebtn_{row_id}"):
                         remove_fact_row(row_id)
-                        st.experimental_rerun()
+                        do_rerun()
 
         if not inc_data.empty:
             for cat_name, group_df in inc_data.groupby("category"):
@@ -801,16 +802,16 @@ elif page_choice == "Debt Domination":
                     if s_col.button("Save", key=f"save_debt_{row_id}"):
                         update_debt_item(row_id, st.session_state["temp_new_balance"])
                         st.session_state["editing_debt_item"] = None
-                        st.experimental_rerun()
+                        do_rerun()
                     if c_col.button("Cancel", key=f"cancel_debt_{row_id}"):
                         st.session_state["editing_debt_item"] = None
-                        st.experimental_rerun()
+                        do_rerun()
 
                 with btns_col:
                     if st.button("❌", key=f"remove_debt_{row_id}"):
                         remove_debt_item(row_id)
                         remove_old_payoff_lines_for_debt(row_name)
-                        st.experimental_rerun()
+                        do_rerun()
 
             else:
                 with main_bar_col:
@@ -863,11 +864,11 @@ elif page_choice == "Debt Domination":
 
                     if edit_clicked:
                         st.session_state["editing_debt_item"] = row_id
-                        st.experimental_rerun()
+                        do_rerun()
                     if remove_clicked:
                         remove_debt_item(row_id)
                         remove_old_payoff_lines_for_debt(row_name)
-                        st.experimental_rerun()
+                        do_rerun()
 
     if st.session_state["active_payoff_plan"] is not None:
         reloaded_df = load_debt_items()
@@ -901,10 +902,10 @@ elif page_choice == "Debt Domination":
                 client.query(query).result()
 
                 st.session_state["active_payoff_plan"] = None
-                st.experimental_rerun()
+                do_rerun()
             if cancel_col.button("Cancel"):
                 st.session_state["active_payoff_plan"] = None
-                st.experimental_rerun()
+                do_rerun()
 
     st.subheader("Add a New Debt Item")
     new_debt_name = st.text_input("Debt Name (e.g. 'Loft Credit Card')", "")
@@ -915,7 +916,7 @@ elif page_choice == "Debt Domination":
     if st.button("Add Debt"):
         if new_debt_name.strip():
             add_debt_item(new_debt_name.strip(), new_debt_balance, new_due_date, new_min_payment)
-        st.experimental_rerun()
+        do_rerun()
 
 # ─────────────────────────────────────────────────────────────────────────────
 # PAGE 3: Budget Overview (Forward 12 months)
