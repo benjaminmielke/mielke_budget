@@ -263,6 +263,29 @@ st.markdown("""
     min-width: 30px;
     text-align: center;
 }
+
+/* Category header styling with light blue background */
+.category-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: #4a89dc; /* Light blue background */
+    color: white;
+    font-weight: bold;
+    padding: 8px 12px;
+    border-radius: 5px;
+    margin: 15px auto 8px auto;
+    max-width: 400px;
+    font-size: 14px;
+}
+
+.category-header .category-name {
+    margin-right: 10px;
+}
+
+.category-header .category-total {
+    font-weight: bold;
+}
 </style>
 """, unsafe_allow_html=True)
 
