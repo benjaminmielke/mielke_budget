@@ -426,7 +426,10 @@ def render_debt_transaction_row(row):
     with cols[1]:
         if st.button("Edit", key=f"edit_debt_{row_id}"):
             st.session_state["editing_debt_item"] = row_id
-            st.experimental_rerun()
+            try:
+                st.experimental_rerun()
+            except Exception:
+                st.stop()
     with cols[2]:
         # If a payoff plan exists, show a green "Recalc" button; otherwise yellow "Payoff"
         if row.get("payoff_plan_date"):
@@ -437,7 +440,10 @@ def render_debt_transaction_row(row):
         if st.button("❌", key=f"delete_debt_{row_id}"):
             remove_debt_item(row_id)
             remove_old_payoff_lines_for_debt(name)
-            st.experimental_rerun()
+            try:
+                st.experimental_rerun()
+            except Exception:
+                st.stop()
 
 # ─────────────────────────────────────────────────────────────────────────────
 # PAGE 1: Budget Planning
