@@ -640,18 +640,27 @@ if page_choice == "Budget Planning":
     # Display Month Title and Navigation Buttons in one horizontal block
     current_month = st.session_state["current_month"]
     current_year = st.session_state["current_year"]
-    st.markdown(f"<div style='text-align: center; font-size: 24px; font-weight: bold; padding: 10px;'>{calendar.month_name[current_month]} {current_year}</div>", unsafe_allow_html=True)
-    col_prev, col_next = st.columns(2)
+    
+    # Create a 3-column layout for the month navigation
+    col_prev, col_title, col_next = st.columns([1, 3, 1])
+    
+    # Previous month arrow button
     with col_prev:
-        if st.button("Previous Month"):
+        if st.button("←", key="prev_month_arrow"):
             if current_month == 1:
                 st.session_state["current_month"] = 12
                 st.session_state["current_year"] -= 1
             else:
                 st.session_state["current_month"] -= 1
             rerun_fallback()
+    
+    # Month/Year title in center column
+    with col_title:
+        st.markdown(f"<div style='text-align: center; font-size: 24px; font-weight: bold; padding: 10px;'>{calendar.month_name[current_month]} {current_year}</div>", unsafe_allow_html=True)
+    
+    # Next month arrow button
     with col_next:
-        if st.button("Next Month"):
+        if st.button("→", key="next_month_arrow"):
             if current_month == 12:
                 st.session_state["current_month"] = 1
                 st.session_state["current_year"] += 1
