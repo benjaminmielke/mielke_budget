@@ -1000,6 +1000,8 @@ if page_choice == "Budget Planning":
             }])
             save_fact_data(tx_df)
             rerun_fallback()
+            # Close the transaction form container
+        st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown("<div class='section-subheader'>Transactions This Month</div>", unsafe_allow_html=True)
 
