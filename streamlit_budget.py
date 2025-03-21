@@ -146,12 +146,51 @@ st.markdown("""
 .calendar-container {
     overflow-x: auto;
     max-width: 90%;
-    margin: auto;
+    margin: 20px auto;
+    background-color: #2c2c2c;
+    border-radius: 10px;
+    padding: 15px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
 }
 .calendar-container table {
     width: 100%;
-    border-collapse: collapse;
+    border-collapse: separate;
+    border-spacing: 3px;
     font-size: 12px;
+}
+.calendar-container th {
+    background-color: #4a89dc;
+    color: white;
+    padding: 8px;
+    border-radius: 5px;
+    font-weight: bold;
+    text-align: center;
+}
+.calendar-container td {
+    background-color: #333;
+    border-radius: 5px;
+    padding: 8px;
+    vertical-align: top;
+    min-height: 80px;
+    text-align: left;
+    color: white;
+    transition: background-color 0.2s;
+}
+.calendar-container td:hover {
+    background-color: #444;
+}
+.calendar-container td strong {
+    display: block;
+    text-align: right;
+    margin-bottom: 5px;
+    font-size: 14px;
+    color: #ddd;
+}
+.calendar-container td span {
+    display: block;
+    padding: 2px 0;
+    border-radius: 3px;
+    margin: 2px 0;
 }
 </style>
 """, unsafe_allow_html=True)
