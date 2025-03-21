@@ -1092,7 +1092,7 @@ if page_choice == "Budget Planning":
         note_input = st.text_area("", label_visibility="collapsed")
 
     cX, cY = st.columns([1,3])
-with cY:
+    with cY:
     if st.button("Add Transaction"):
         # Generate transactions for the selected number of months
         rows_to_insert = []
