@@ -107,14 +107,24 @@ st.markdown("""
     padding: 4px;
     border-radius: 4px;
     margin: 4px auto;
-    max-width: 360px;
-    font-size: 12px;
+    max-width: 420px; /* Wider container */
+    font-size: 11px; /* Slightly smaller font */
     font-family: sans-serif;
+    flex-wrap: nowrap; /* Prevent wrapping */
 }
 
 /* Prevent spans from wrapping */
 .line-item-container span {
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Make the middle span flexible and truncate if needed */
+.line-item-container span:nth-child(2) {
+    flex: 1;
+    min-width: 0;
+    text-overflow: ellipsis;
 }
 
 /* Inline button styles */
@@ -126,6 +136,8 @@ st.markdown("""
     padding: 2px 4px;
     font-size: 10px;
     cursor: pointer;
+    white-space: nowrap; /* Prevent button text from wrapping */
+    flex-shrink: 0; /* Don't shrink buttons */
 }
 .line-item-button.remove {
     background-color: #900;
