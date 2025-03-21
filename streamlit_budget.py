@@ -985,6 +985,7 @@ if page_choice == "Budget Planning":
 
     cX, cY = st.columns([1,3])
     with cY:
+        st.markdown('<div class="form-divider"></div>', unsafe_allow_html=True)
         if st.button("Add Transaction"):
             row_id = str(uuid.uuid4())
             tx_df = pd.DataFrame([{
