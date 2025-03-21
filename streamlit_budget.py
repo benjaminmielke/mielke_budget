@@ -107,7 +107,7 @@ st.markdown("""
     padding: 4px;
     border-radius: 4px;
     margin: 4px auto;
-    max-width: 420px; /* Wider container */
+    max-width: 400px; /* Wider container */
     font-size: 11px; /* Slightly smaller font */
     font-family: sans-serif;
     flex-wrap: nowrap; /* Prevent wrapping */
