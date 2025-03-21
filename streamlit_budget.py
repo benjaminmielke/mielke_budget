@@ -275,7 +275,7 @@ st.markdown("""
     padding: 8px 12px;
     border-radius: 5px;
     margin: 15px auto 8px auto;
-    max-width: 400px;
+    width: 100%;
     font-size: 14px;
 }
 
