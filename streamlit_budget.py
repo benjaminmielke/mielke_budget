@@ -150,7 +150,7 @@ client = bigquery.Client(credentials=credentials, project=PROJECT_ID)
 def load_dimension_rows(type_val):
     query = f"""
     SELECT rowid, type, category, budget_item
-    FROM `{PROJECT_ID}.{DATASET_ID}.{CATS_TABLE_NAME}`
+    FROM {PROJECT_ID}.{DATASET_ID}.{CATS_TABLE_NAME}
     WHERE LOWER(type) = LOWER('{type_val}')
     """
     return client.query(query).to_dataframe()
@@ -172,7 +172,7 @@ def add_dimension_row(type_val, category_val, budget_item_val):
 # 5) Fact Table Functions (Budget Planning)
 # ─────────────────────────────────────────────────────────────────────────────
 def load_fact_data():
-    query = f"SELECT * FROM `{PROJECT_ID}.{DATASET_ID}.{FACT_TABLE_NAME}`"
+    query = f"SELECT * FROM {PROJECT_ID}.{DATASET_ID}.{FACT_TABLE_NAME}"
     df = client.query(query).to_dataframe()
     df['date'] = pd.to_datetime(df['date'])
     return df
@@ -185,7 +185,7 @@ def save_fact_data(rows_df):
 
 def remove_fact_row(row_id):
     query = f"""
-    DELETE FROM `{PROJECT_ID}.{DATASET_ID}.{FACT_TABLE_NAME}`
+    DELETE FROM {PROJECT_ID}.{DATASET_ID}.{FACT_TABLE_NAME}
     WHERE rowid = '{row_id}'
     """
     client.query(query).result()
@@ -193,7 +193,7 @@ def remove_fact_row(row_id):
 def update_fact_row(row_id, new_date, new_amount):
     date_str = new_date.strftime("%Y-%m-%d")
     query = f"""
-    UPDATE `{PROJECT_ID}.{DATASET_ID}.{FACT_TABLE_NAME}`
+    UPDATE {PROJECT_ID}.{DATASET_ID}.{FACT_TABLE_NAME}
     SET date = '{date_str}', amount = {new_amount}
     WHERE rowid = '{row_id}'
     """
@@ -202,7 +202,7 @@ def update_fact_row(row_id, new_date, new_amount):
 def remove_old_payoff_lines_for_debt(debt_name):
     escaped_name = debt_name.replace("'", "''")
     query = f"""
-    DELETE FROM `{PROJECT_ID}.{DATASET_ID}.{FACT_TABLE_NAME}`
+    DELETE FROM {PROJECT_ID}.{DATASET_ID}.{FACT_TABLE_NAME}
     WHERE type='expense'
       AND category='Debt Payment'
       AND budget_item='{escaped_name}'
@@ -214,7 +214,7 @@ def remove_old_payoff_lines_for_debt(debt_name):
 # 6) Debt Domination Table Functions
 # ─────────────────────────────────────────────────────────────────────────────
 def load_debt_items():
-    query = f"SELECT * FROM `{PROJECT_ID}.{DATASET_ID}.{DEBT_TABLE_NAME}`"
+    query = f"SELECT * FROM {PROJECT_ID}.{DATASET_ID}.{DEBT_TABLE_NAME}"
     df = client.query(query).to_dataframe()
     if "payoff_plan_date" in df.columns:
         df["payoff_plan_date"] = pd.to_datetime(df["payoff_plan_date"]).dt.date
@@ -246,14 +246,14 @@ def add_debt_item(debt_name, current_balance, due_date, min_payment):
 
 def remove_debt_item(row_id):
     query = f"""
-    DELETE FROM `{PROJECT_ID}.{DATASET_ID}.{DEBT_TABLE_NAME}`
+    DELETE FROM {PROJECT_ID}.{DATASET_ID}.{DEBT_TABLE_NAME}
     WHERE rowid = '{row_id}'
     """
     client.query(query).result()
 
 def update_debt_item(row_id, new_balance):
     query = f"""
-    UPDATE `{PROJECT_ID}.{DATASET_ID}.{DEBT_TABLE_NAME}`
+    UPDATE {PROJECT_ID}.{DATASET_ID}.{DEBT_TABLE_NAME}
     SET current_balance = {new_balance}
     WHERE rowid = '{row_id}'
     """
@@ -262,14 +262,14 @@ def update_debt_item(row_id, new_balance):
 def update_debt_payoff_plan_date(row_id, new_date):
     if new_date is None:
         query = f"""
-        UPDATE `{PROJECT_ID}.{DATASET_ID}.{DEBT_TABLE_NAME}`
+        UPDATE {PROJECT_ID}.{DATASET_ID}.{DEBT_TABLE_NAME}
         SET payoff_plan_date = NULL
         WHERE rowid = '{row_id}'
         """
     else:
         date_str = new_date.strftime("%Y-%m-%d")
         query = f"""
-        UPDATE `{PROJECT_ID}.{DATASET_ID}.{DEBT_TABLE_NAME}`
+        UPDATE {PROJECT_ID}.{DATASET_ID}.{DEBT_TABLE_NAME}
         SET payoff_plan_date = '{date_str}'
         WHERE rowid = '{row_id}'
         """
@@ -648,7 +648,7 @@ if page_choice == "Budget Planning":
             amount_str = f"${row['amount']:,.2f}"
             is_editing = (st.session_state["editing_budget_item"] == row_id)
 
-            main_bar_col, btns_col = st.columns([0.75, 0.25])
+            main_bar_col, btns_col = st.columns([0.50, 0.10])
 
             if is_editing:
                 with main_bar_col:
@@ -894,7 +894,7 @@ elif page_choice == "Debt Domination":
                 )
                 date_str = st.session_state["temp_payoff_date"].strftime("%Y-%m-%d")
                 query = f"""
-                UPDATE `{PROJECT_ID}.{DATASET_ID}.{DEBT_TABLE_NAME}`
+                UPDATE {PROJECT_ID}.{DATASET_ID}.{DEBT_TABLE_NAME}
                 SET payoff_plan_date = '{date_str}'
                 WHERE rowid = '{st.session_state["active_payoff_plan"]}'
                 """
