@@ -444,106 +444,6 @@ def render_debt_transaction_edit(row):
         st.experimental_rerun()
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Updated render_budget_row with try/except blocks for st.experimental_rerun()
-# ─────────────────────────────────────────────────────────────────────────────
-def render_budget_row(row, color_class):
-    row_id = row["rowid"]
-    date_str = row["date"].strftime("%Y-%m-%d")
-    item_str = row["budget_item"]
-    amount_str = f"${row['amount']:,.2f}"
-    is_editing = (st.session_state["editing_budget_item"] == row_id)
-
-    main_bar_col, btns_col = st.columns([0.50, 0.10])
-
-    if is_editing:
-        with main_bar_col:
-            st.markdown(f"""
-            <div style="display:flex;align-items:center;background-color:#333;
-                        padding:8px;border-radius:5px;margin-bottom:4px;
-                        justify-content:space-between;">
-                <div style="font-size:14px;font-weight:bold;color:#fff; min-width:80px;">
-                    Editing...
-                </div>
-                <div style="flex:1;margin-left:8px;color:#fff;font-size:14px;">
-                    {item_str}
-                </div>
-                <div style="font-size:14px;font-weight:bold;text-align:right;
-                            min-width:60px;margin-left:8px;color:{color_class};">
-                    {amount_str}
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-
-            st.session_state["temp_budget_edit_date"] = st.date_input(
-                "Date", value=row["date"], key=f"edit_date_{row_id}"
-            )
-            st.session_state["temp_budget_edit_amount"] = st.number_input(
-                "Amount", min_value=0.0, format="%.2f", 
-                value=float(row["amount"]), key=f"edit_amount_{row_id}"
-            )
-
-            sc1, sc2 = st.columns(2)
-            if sc1.button("Save", key=f"save_{row_id}"):
-                update_fact_row(
-                    row_id, 
-                    st.session_state["temp_budget_edit_date"],
-                    st.session_state["temp_budget_edit_amount"]
-                )
-                st.session_state["editing_budget_item"] = None
-                try:
-                    st.experimental_rerun()
-                except AttributeError:
-                    st.stop()
-            if sc2.button("Cancel", key=f"cancel_{row_id}"):
-                st.session_state["editing_budget_item"] = None
-                try:
-                    st.experimental_rerun()
-                except AttributeError:
-                    st.stop()
-
-        with btns_col:
-            if st.button("❌", key=f"remove_{row_id}"):
-                remove_fact_row(row_id)
-                try:
-                    st.experimental_rerun()
-                except AttributeError:
-                    st.stop()
-
-    else:
-        with main_bar_col:
-            st.markdown(f"""
-            <div style="display:flex;align-items:center;background-color:#333;
-                        padding:8px;border-radius:5px;margin-bottom:4px;
-                        justify-content:space-between;">
-                <div style="font-size:14px;font-weight:bold;color:#fff; min-width:80px;">
-                    {date_str}
-                </div>
-                <div style="flex:1;margin-left:8px;color:#fff;font-size:14px;">
-                    {item_str}
-                </div>
-                <div style="font-size:14px;font-weight:bold;text-align:right;
-                            min-width:60px;margin-left:8px;color:{color_class};">
-                    {amount_str}
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-
-        with btns_col:
-            e_col, x_col = st.columns(2)
-            if e_col.button("Edit", key=f"editbtn_{row_id}"):
-                st.session_state["editing_budget_item"] = row_id
-                try:
-                    st.experimental_rerun()
-                except AttributeError:
-                    st.stop()
-            if x_col.button("❌", key=f"removebtn_{row_id}"):
-                remove_fact_row(row_id)
-                try:
-                    st.experimental_rerun()
-                except AttributeError:
-                    st.stop()
-
-# ─────────────────────────────────────────────────────────────────────────────
 # PAGE 1: Budget Planning
 # ─────────────────────────────────────────────────────────────────────────────
 if page_choice == "Budget Planning":
@@ -740,6 +640,88 @@ if page_choice == "Budget Planning":
     else:
         inc_data = filtered_data[filtered_data["type"]=="income"]
         exp_data = filtered_data[filtered_data["type"]=="expense"]
+
+        def render_budget_row(row, color_class):
+            row_id = row["rowid"]
+            date_str = row["date"].strftime("%Y-%m-%d")
+            item_str = row["budget_item"]
+            amount_str = f"${row['amount']:,.2f}"
+            is_editing = (st.session_state["editing_budget_item"] == row_id)
+
+            main_bar_col, btns_col = st.columns([0.75, 0.25])
+
+            if is_editing:
+                with main_bar_col:
+                    st.markdown(f"""
+                    <div style="display:flex;align-items:center;background-color:#333;
+                                padding:8px;border-radius:5px;margin-bottom:4px;
+                                justify-content:space-between;">
+                        <div style="font-size:14px;font-weight:bold;color:#fff; min-width:80px;">
+                            Editing...
+                        </div>
+                        <div style="flex:1;margin-left:8px;color:#fff;font-size:14px;">
+                            {item_str}
+                        </div>
+                        <div style="font-size:14px;font-weight:bold;text-align:right;
+                                    min-width:60px;margin-left:8px;color:{color_class};">
+                            {amount_str}
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                    st.session_state["temp_budget_edit_date"] = st.date_input(
+                        "Date", value=row["date"], key=f"edit_date_{row_id}"
+                    )
+                    st.session_state["temp_budget_edit_amount"] = st.number_input(
+                        "Amount", min_value=0.0, format="%.2f", 
+                        value=float(row["amount"]), key=f"edit_amount_{row_id}"
+                    )
+
+                    sc1, sc2 = st.columns(2)
+                    if sc1.button("Save", key=f"save_{row_id}"):
+                        update_fact_row(
+                            row_id, 
+                            st.session_state["temp_budget_edit_date"],
+                            st.session_state["temp_budget_edit_amount"]
+                        )
+                        st.session_state["editing_budget_item"] = None
+                        st.experimental_rerun()
+                    if sc2.button("Cancel", key=f"cancel_{row_id}"):
+                        st.session_state["editing_budget_item"] = None
+                        st.experimental_rerun()
+
+                with btns_col:
+                    if st.button("❌", key=f"remove_{row_id}"):
+                        remove_fact_row(row_id)
+                        st.experimental_rerun()
+
+            else:
+                with main_bar_col:
+                    st.markdown(f"""
+                    <div style="display:flex;align-items:center;background-color:#333;
+                                padding:8px;border-radius:5px;margin-bottom:4px;
+                                justify-content:space-between;">
+                        <div style="font-size:14px;font-weight:bold;color:#fff; min-width:80px;">
+                            {date_str}
+                        </div>
+                        <div style="flex:1;margin-left:8px;color:#fff;font-size:14px;">
+                            {item_str}
+                        </div>
+                        <div style="font-size:14px;font-weight:bold;text-align:right;
+                                    min-width:60px;margin-left:8px;color:{color_class};">
+                            {amount_str}
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                with btns_col:
+                    e_col, x_col = st.columns(2)
+                    if e_col.button("Edit", key=f"editbtn_{row_id}"):
+                        st.session_state["editing_budget_item"] = row_id
+                        st.experimental_rerun()
+                    if x_col.button("❌", key=f"removebtn_{row_id}"):
+                        remove_fact_row(row_id)
+                        st.experimental_rerun()
 
         if not inc_data.empty:
             for cat_name, group_df in inc_data.groupby("category"):
