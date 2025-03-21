@@ -1079,9 +1079,9 @@ if page_choice == "Budget Planning":
 
     cA, cB = st.columns([1,3])
     with cA:
-    st.write("Repeat for:")
+        st.write("Repeat for:")
     with cB:
-    num_months = st.number_input("", min_value=1, max_value=36, value=1, 
+        num_months = st.number_input("", min_value=1, max_value=36, value=1, 
                                  step=1, help="Number of months this transaction should be repeated", 
                                  label_visibility="collapsed")
     
