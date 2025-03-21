@@ -1093,76 +1093,76 @@ if page_choice == "Budget Planning":
 
     cX, cY = st.columns([1,3])
     with cY:
-    if st.button("Add Transaction"):
-        # Generate transactions for the selected number of months
-        rows_to_insert = []
-        
-        # Get the day of the month from the selected date
-        day_of_month = date_input.day
-        
-        # For each month in the range
-        for i in range(num_months):
-            # Calculate the date for this occurrence
-            if i == 0:
-                # First occurrence uses the exact date selected
-                current_date = date_input
-            else:
-                # For subsequent months, use the same day of month
-                # Create a date for the next month
-                next_month = date_input.month + i
-                next_year = date_input.year
-                
-                # Handle year rollover if needed
-                while next_month > 12:
-                    next_month -= 12
-                    next_year += 1
-                
-                # Handle months with fewer days than the selected day
-                # (e.g., if selected 31st but next month only has 30 days)
-                max_day = calendar.monthrange(next_year, next_month)[1]
-                actual_day = min(day_of_month, max_day)
-                
-                current_date = date(next_year, next_month, actual_day)
+        if st.button("Add Transaction"):
+            # Generate transactions for the selected number of months
+            rows_to_insert = []
             
-            # Create a transaction for this month
-            row_id = str(uuid.uuid4())
+            # Get the day of the month from the selected date
+            day_of_month = date_input.day
             
-            # Add a note indicating this is part of a recurring series for all but the first transaction
-            current_note = note_input
-            if i > 0:
-                if current_note:
-                    current_note += f" (Recurring {i+1}/{num_months})"
+            # For each month in the range
+            for i in range(num_months):
+                # Calculate the date for this occurrence
+                if i == 0:
+                    # First occurrence uses the exact date selected
+                    current_date = date_input
                 else:
-                    current_note = f"Recurring {i+1}/{num_months}"
-            elif num_months > 1:
-                if current_note:
-                    current_note += f" (Recurring 1/{num_months})"
-                else:
-                    current_note = f"Recurring 1/{num_months}"
-            
-            rows_to_insert.append({
-                "rowid": row_id,
-                "date": current_date,
-                "type": type_input,
-                "amount": amount_input,
-                "category": category_input,
-                "budget_item": budget_item_input,
-                "credit_card": None,
-                "note": current_note
-            })
-        
-        # Save all transactions at once
-        if rows_to_insert:
-            tx_df = pd.DataFrame(rows_to_insert)
-            save_fact_data(tx_df)
-            
-            # Show a success message with details about the recurring transactions
-            if num_months > 1:
-                st.success(f"Added {num_months} recurring transactions for {budget_item_input}")
-            else:
-                st.success(f"Added transaction for {budget_item_input}")
+                    # For subsequent months, use the same day of month
+                    # Create a date for the next month
+                    next_month = date_input.month + i
+                    next_year = date_input.year
+                    
+                    # Handle year rollover if needed
+                    while next_month > 12:
+                        next_month -= 12
+                        next_year += 1
+                    
+                    # Handle months with fewer days than the selected day
+                    # (e.g., if selected 31st but next month only has 30 days)
+                    max_day = calendar.monthrange(next_year, next_month)[1]
+                    actual_day = min(day_of_month, max_day)
+                    
+                    current_date = date(next_year, next_month, actual_day)
                 
-            rerun_fallback()
+                # Create a transaction for this month
+                row_id = str(uuid.uuid4())
+                
+                # Add a note indicating this is part of a recurring series for all but the first transaction
+                current_note = note_input
+                if i > 0:
+                    if current_note:
+                        current_note += f" (Recurring {i+1}/{num_months})"
+                    else:
+                        current_note = f"Recurring {i+1}/{num_months}"
+                elif num_months > 1:
+                    if current_note:
+                        current_note += f" (Recurring 1/{num_months})"
+                    else:
+                        current_note = f"Recurring 1/{num_months}"
+                
+                rows_to_insert.append({
+                    "rowid": row_id,
+                    "date": current_date,
+                    "type": type_input,
+                    "amount": amount_input,
+                    "category": category_input,
+                    "budget_item": budget_item_input,
+                    "credit_card": None,
+                    "note": current_note
+                })
+            
+            # Save all transactions at once
+            if rows_to_insert:
+                tx_df = pd.DataFrame(rows_to_insert)
+                save_fact_data(tx_df)
+                
+                # Show a success message with details about the recurring transactions
+                if num_months > 1:
+                    st.success(f"Added {num_months} recurring transactions for {budget_item_input}")
+                else:
+                    st.success(f"Added transaction for {budget_item_input}")
+                    
+                rerun_fallback()
 # ─────────────────────────────────────────────────────────────────────────────
 # PAGE 2: Debt Domination
 # ─────────────────────────────────────────────────────────────────────────────
