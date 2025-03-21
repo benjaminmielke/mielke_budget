@@ -1079,67 +1079,90 @@ if page_choice == "Budget Planning":
 
     cA, cB = st.columns([1,3])
     with cA:
+    st.write("Repeat for:")
+    with cB:
+    num_months = st.number_input("", min_value=1, max_value=36, value=1, 
+                                 step=1, help="Number of months this transaction should be repeated", 
+                                 label_visibility="collapsed")
+    
+    cA, cB = st.columns([1,3])
+    with cA:
         st.write("Note:")
     with cB:
         note_input = st.text_area("", label_visibility="collapsed")
 
     cX, cY = st.columns([1,3])
-    with cY:
-        st.markdown('<div class="form-divider"></div>', unsafe_allow_html=True)
-        if st.button("Add Transaction"):
+with cY:
+    if st.button("Add Transaction"):
+        # Generate transactions for the selected number of months
+        rows_to_insert = []
+        
+        # Get the day of the month from the selected date
+        day_of_month = date_input.day
+        
+        # For each month in the range
+        for i in range(num_months):
+            # Calculate the date for this occurrence
+            if i == 0:
+                # First occurrence uses the exact date selected
+                current_date = date_input
+            else:
+                # For subsequent months, use the same day of month
+                # Create a date for the next month
+                next_month = date_input.month + i
+                next_year = date_input.year
+                
+                # Handle year rollover if needed
+                while next_month > 12:
+                    next_month -= 12
+                    next_year += 1
+                
+                # Handle months with fewer days than the selected day
+                # (e.g., if selected 31st but next month only has 30 days)
+                max_day = calendar.monthrange(next_year, next_month)[1]
+                actual_day = min(day_of_month, max_day)
+                
+                current_date = date(next_year, next_month, actual_day)
+            
+            # Create a transaction for this month
             row_id = str(uuid.uuid4())
-            tx_df = pd.DataFrame([{
+            
+            # Add a note indicating this is part of a recurring series for all but the first transaction
+            current_note = note_input
+            if i > 0:
+                if current_note:
+                    current_note += f" (Recurring {i+1}/{num_months})"
+                else:
+                    current_note = f"Recurring {i+1}/{num_months}"
+            elif num_months > 1:
+                if current_note:
+                    current_note += f" (Recurring 1/{num_months})"
+                else:
+                    current_note = f"Recurring 1/{num_months}"
+            
+            rows_to_insert.append({
                 "rowid": row_id,
-                "date": date_input,
+                "date": current_date,
                 "type": type_input,
                 "amount": amount_input,
                 "category": category_input,
                 "budget_item": budget_item_input,
                 "credit_card": None,
-                "note": note_input
-            }])
+                "note": current_note
+            })
+        
+        # Save all transactions at once
+        if rows_to_insert:
+            tx_df = pd.DataFrame(rows_to_insert)
             save_fact_data(tx_df)
+            
+            # Show a success message with details about the recurring transactions
+            if num_months > 1:
+                st.success(f"Added {num_months} recurring transactions for {budget_item_input}")
+            else:
+                st.success(f"Added transaction for {budget_item_input}")
+                
             rerun_fallback()
-            # Close the transaction form container
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    st.markdown("<div class='section-subheader'>Transactions This Month</div>", unsafe_allow_html=True)
-
-    if filtered_data.empty:
-        st.write("No transactions found for this month.")
-    else:
-        inc_data = filtered_data[filtered_data["type"]=="income"]
-        exp_data = filtered_data[filtered_data["type"]=="expense"]
-    
-        if not inc_data.empty:
-            for cat_name, group_df in inc_data.groupby("category"):
-                # Calculate category total
-                cat_total = group_df["amount"].sum()
-                # Render category header with total
-                st.markdown(f"""
-                <div class="category-header">
-                    <span class="category-name">{cat_name}</span>
-                    <span class="category-total" style="color: white;">Total: ${cat_total:,.2f}</span>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                for _, row in group_df.iterrows():
-                    render_budget_row(row, "#00cc00")
-    
-        if not exp_data.empty:
-            for cat_name, group_df in exp_data.groupby("category"):
-                # Calculate category total
-                cat_total = group_df["amount"].sum()
-                # Render category header with total
-                st.markdown(f"""
-                <div class="category-header">
-                    <span class="category-name">{cat_name}</span>
-                    <span class="category-total" style="color: white;">Total: ${cat_total:,.2f}</span>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                for _, row in group_df.iterrows():
-                    render_budget_row(row, "#ff4444")
 # ─────────────────────────────────────────────────────────────────────────────
 # PAGE 2: Debt Domination
 # ─────────────────────────────────────────────────────────────────────────────
