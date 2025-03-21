@@ -16,21 +16,36 @@ def get_query_params_fallback():
     Safely read query params:
     - If st.query_params exists (newer Streamlit), use it.
     - Else fallback to st.experimental_get_query_params (older Streamlit).
+    
+    Returns a dict-like object that can be accessed with standard
+    dictionary syntax.
     """
     if hasattr(st, "query_params"):
-        return st.query_params
+        # Convert to dict to ensure consistent behavior
+        return dict(st.query_params)
     else:
         return st.experimental_get_query_params()
 
 def set_query_params_fallback(**kwargs):
     """
     Safely set query params:
-    - If st.set_query_params exists (newer Streamlit), use it.
+    - If st.query_params.update exists (newest Streamlit), use it.
+    - Else if st.query_params exists (newer Streamlit), manually set.
     - Else fallback to st.experimental_set_query_params (older Streamlit).
     """
-    if hasattr(st, "set_query_params"):
-        st.set_query_params(**kwargs)
+    if hasattr(st, "query_params") and hasattr(st.query_params, "update"):
+        # Newest API (Streamlit 1.32+)
+        st.query_params.update(**kwargs)
+    elif hasattr(st, "query_params"):
+        # Newer API but without update method
+        # Clear existing params then set new ones
+        current_params = dict(st.query_params)
+        for key in list(current_params.keys()):
+            del st.query_params[key]
+        for key, value in kwargs.items():
+            st.query_params[key] = value
     else:
+        # Legacy API
         st.experimental_set_query_params(**kwargs)
 
 def rerun_fallback():
@@ -434,7 +449,7 @@ def render_debt_transaction_row(row):
       <span style="color:#fff;">Due: {due}, Min: {min_pay}</span>
       <span style="color:red;">{balance_str}</span>
       <button class="line-item-button" onclick="window.location.href='?action=edit_debt&rowid={row_id}'">Edit</button>
-      <button class="line-item-button" onclick="window.location.href='?action=payoff&rowid={row_id}'">{payoff_text}</button>
+      <button class="line-item-button" onclick="window.location.href='?payoff={row_id}'">{payoff_text}</button>
       <button class="line-item-button remove" onclick="window.location.href='?action=remove_debt&rowid={row_id}'">❌</button>
     </div>
     """
