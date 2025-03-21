@@ -442,18 +442,50 @@ def render_debt_transaction_row(row):
     balance_str = f"${row['current_balance']:,.2f}"
     due = row["due_date"] if row["due_date"] else "(None)"
     min_pay = row["minimum_payment"] if pd.notnull(row["minimum_payment"]) else "(None)"
-    payoff_text = "Recalc" if row.get("payoff_plan_date") else "Payoff"
+    is_recalc = True if row.get("payoff_plan_date") else False
+    
+    # Display the main debt information and Edit/Delete buttons using HTML
     html = f"""
-    <div class="line-item-container">
+    <div class="line-item-container" style="margin-bottom:0px; border-bottom-left-radius:0; border-bottom-right-radius:0;">
       <span style="color:#fff; font-weight:bold;">{name}</span>
       <span style="color:#fff;">Due: {due}, Min: {min_pay}</span>
       <span style="color:red;">{balance_str}</span>
       <button class="line-item-button" onclick="window.location.href='?action=edit_debt&rowid={row_id}'">Edit</button>
-      <button class="line-item-button" onclick="window.location.href='?payoff={row_id}'">{payoff_text}</button>
       <button class="line-item-button remove" onclick="window.location.href='?action=remove_debt&rowid={row_id}'">❌</button>
     </div>
     """
     st.markdown(html, unsafe_allow_html=True)
+    
+    # Use native Streamlit button for the Payoff/Recalc functionality
+    # Create a container that matches the style of the line item
+    button_container = f"""
+    <div style="display:flex; justify-content:center; background-color:#333; 
+                max-width:360px; margin:0 auto 4px auto; padding:4px; 
+                border-top:none; border-bottom-left-radius:4px; border-bottom-right-radius:4px;">
+    </div>
+    """
+    st.markdown(button_container, unsafe_allow_html=True)
+    
+    # Now add the native Streamlit button that will handle the action properly
+    if is_recalc:
+        if st.button("Recalculate Payment Plan", key=f"recalc_btn_{row_id}"):
+            # Process recalc action directly
+            reloaded_df = load_debt_items()
+            match = reloaded_df[reloaded_df["rowid"] == row_id]
+            if not match.empty:
+                plan_data = match.iloc[0]
+                plan_name = plan_data["debt_name"]
+                plan_balance = plan_data["current_balance"]
+                plan_due = plan_data["due_date"] if plan_data["due_date"] else ""
+                plan_existing = plan_data["payoff_plan_date"] if plan_data["payoff_plan_date"] else datetime.today().date()
+                insert_monthly_payments_for_debt(plan_name, plan_balance, plan_due, plan_existing)
+                st.success("Payment plan recalculated!")
+                rerun_fallback()
+    else:
+        if st.button("Create Payoff Plan", key=f"payoff_btn_{row_id}"):
+            # Set the active payoff plan directly
+            st.session_state["active_payoff_plan"] = row_id
+            rerun_fallback()
 
 def render_debt_transaction_edit(row):
     row_id = row["rowid"]
