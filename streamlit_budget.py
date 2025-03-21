@@ -891,7 +891,10 @@ if page_choice == "Budget Planning":
     cal_df = pd.DataFrame(calendar_grid, columns=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"])
     st.markdown(f'<div class="calendar-container">{cal_df.to_html(index=False, escape=False)}</div>', unsafe_allow_html=True)
 
-    st.markdown("<div class='section-subheader'>Add New Income/Expense</div>", unsafe_allow_html=True)
+    st.markdown("""
+    <div class="transaction-form-container">
+        <div class="transaction-form-title">Add New Transaction</div>
+    """, unsafe_allow_html=True)
 
     # Form to add Income/Expense
     cA, cB = st.columns([1,3])
