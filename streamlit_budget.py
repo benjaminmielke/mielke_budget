@@ -414,7 +414,6 @@ def render_debt_transaction_row(row):
     balance_str = f"${row['current_balance']:,.2f}"
     due = row["due_date"] if row["due_date"] else "(None)"
     min_pay = row["minimum_payment"] if pd.notnull(row["minimum_payment"]) else "(None)"
-    # Four columns: info, Edit, Payoff/Recalc, Delete.
     cols = st.columns([4, 1, 1, 1])
     with cols[0]:
         st.markdown(f"""
@@ -429,11 +428,11 @@ def render_debt_transaction_row(row):
             st.session_state["editing_debt_item"] = row_id
             st.experimental_rerun()
     with cols[2]:
-        # Show "Recalc" if a payoff plan exists; else "Payoff"
+        # If a payoff plan exists, show a green "Recalc" button; otherwise yellow "Payoff"
         if row.get("payoff_plan_date"):
-            st.markdown(f"""<a class="custom-btn" href="?recalc={row_id}">Recalc</a>""", unsafe_allow_html=True)
+            st.markdown(f"""<a href="?recalc={row_id}" style="display:inline-block; background-color:green; color:white; font-weight:bold; border-radius:5px; padding:4px 8px; text-decoration:none;">Recalc</a>""", unsafe_allow_html=True)
         else:
-            st.markdown(f"""<a class="custom-btn" href="?payoff={row_id}">Payoff</a>""", unsafe_allow_html=True)
+            st.markdown(f"""<a href="?payoff={row_id}" style="display:inline-block; background-color:yellow; color:black; font-weight:bold; border-radius:5px; padding:4px 8px; text-decoration:none;">Payoff</a>""", unsafe_allow_html=True)
     with cols[3]:
         if st.button("❌", key=f"delete_debt_{row_id}"):
             remove_debt_item(row_id)
