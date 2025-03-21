@@ -90,24 +90,14 @@ st.markdown("""
     color: #fff;
 }
 
-/* Background bar for line items */
-.line-item-container {
+/* Background bar for the line item info */
+.line-item-info {
     background-color: #333;
     border-radius: 5px;
     padding: 8px;
-    margin: 4px auto;
-    max-width: 800px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-
-/* Stylized text within the bar */
-.line-item-text {
     color: #fff;
     font-size: 14px;
     white-space: nowrap;
-    margin: 0 8px;
 }
 
 /* Custom button styles for edit and delete */
@@ -116,7 +106,7 @@ st.markdown("""
     color: #fff;
     border: none;
     border-radius: 3px;
-    padding: 4px 8px;
+    padding: 6px 12px;
     font-size: 12px;
     cursor: pointer;
     margin-left: 8px;
@@ -393,23 +383,31 @@ st.sidebar.title("Mielke Finances")
 page_choice = st.sidebar.radio("Navigation", ["Budget Planning", "Debt Domination", "Budget Overview"])
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Helper functions to render transaction and debt rows using HTML with background bar
+# Helper functions to render transaction and debt rows with a background bar for info only
 
 def render_transaction_row(row, color_class):
     row_id = row["rowid"]
     date_str = row["date"].strftime("%Y-%m-%d")
     item_str = row["budget_item"]
     amount_str = f"${row['amount']:,.2f}"
-    html = f"""
-    <div class="line-item-container">
-      <span class="line-item-text" style="font-weight:bold;">{date_str}</span>
-      <span class="line-item-text">{item_str}</span>
-      <span class="line-item-text" style="color:{color_class};">{amount_str}</span>
-      <button class="custom-btn" onclick="window.location.href='?action=edit&rowid={row_id}'">Edit</button>
-      <button class="custom-btn delete" onclick="window.location.href='?action=remove&rowid={row_id}'">❌</button>
-    </div>
-    """
-    st.markdown(html, unsafe_allow_html=True)
+    # Use three columns: info, Edit button, Delete button.
+    cols = st.columns([4, 1, 1])
+    with cols[0]:
+        st.markdown(f"""
+        <div class="line-item-info">
+            <span style="font-weight:bold;">{date_str}</span>
+            <span>{item_str}</span>
+            <span style="color:{color_class};">{amount_str}</span>
+        </div>
+        """, unsafe_allow_html=True)
+    with cols[1]:
+        if st.button("Edit", key=f"edit_{row_id}"):
+            st.session_state["editing_budget_item"] = row_id
+            st.experimental_rerun()
+    with cols[2]:
+        if st.button("❌", key=f"delete_{row_id}"):
+            remove_fact_row(row_id)
+            st.experimental_rerun()
 
 def render_debt_transaction_row(row):
     row_id = row["rowid"]
@@ -417,16 +415,24 @@ def render_debt_transaction_row(row):
     balance_str = f"${row['current_balance']:,.2f}"
     due = row["due_date"] if row["due_date"] else "(None)"
     min_pay = row["minimum_payment"] if pd.notnull(row["minimum_payment"]) else "(None)"
-    html = f"""
-    <div class="line-item-container">
-      <span class="line-item-text">{name}</span>
-      <span class="line-item-text">Due: {due}, Min: {min_pay}</span>
-      <span class="line-item-text" style="color:red;">{balance_str}</span>
-      <button class="custom-btn" onclick="window.location.href='?action=edit_debt&rowid={row_id}'">Edit</button>
-      <button class="custom-btn delete" onclick="window.location.href='?action=remove_debt&rowid={row_id}'">❌</button>
-    </div>
-    """
-    st.markdown(html, unsafe_allow_html=True)
+    cols = st.columns([4, 1, 1])
+    with cols[0]:
+        st.markdown(f"""
+        <div class="line-item-info">
+            <span>{name}</span>
+            <span>Due: {due}, Min: {min_pay}</span>
+            <span style="color:red;">{balance_str}</span>
+        </div>
+        """, unsafe_allow_html=True)
+    with cols[1]:
+        if st.button("Edit", key=f"edit_debt_{row_id}"):
+            st.session_state["editing_debt_item"] = row_id
+            st.experimental_rerun()
+    with cols[2]:
+        if st.button("❌", key=f"delete_debt_{row_id}"):
+            remove_debt_item(row_id)
+            remove_old_payoff_lines_for_debt(name)
+            st.experimental_rerun()
 
 # ─────────────────────────────────────────────────────────────────────────────
 # PAGE 1: Budget Planning
@@ -442,7 +448,6 @@ if page_choice == "Budget Planning":
     current_year = st.session_state["current_year"]
     st.markdown(f"<div style='text-align: center; font-size: 24px; font-weight: bold; padding: 10px;'>{calendar.month_name[current_month]} {current_year}</div>", unsafe_allow_html=True)
     
-    # Month Navigation
     col_prev, col_next = st.columns(2)
     with col_prev:
         if st.button("Previous Month"):
@@ -471,7 +476,6 @@ if page_choice == "Budget Planning":
     total_expenses = filtered_data[filtered_data["type"]=="expense"]["amount"].sum()
     leftover = total_income - total_expenses
     
-    # Top Metrics with background bar
     st.markdown(f"""
     <div class="metrics-container">
         <div class="metric-box">
@@ -510,7 +514,6 @@ if page_choice == "Budget Planning":
     cal_df = pd.DataFrame(calendar_grid, columns=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"])
     st.markdown(f'<div class="calendar-container">{cal_df.to_html(index=False, escape=False)}</div>', unsafe_allow_html=True)
     
-    # Add New Transaction
     st.markdown("<div class='section-subheader'>Add New Income/Expense</div>", unsafe_allow_html=True)
     cA, cB = st.columns([1,3])
     with cA:
@@ -612,9 +615,7 @@ if page_choice == "Budget Planning":
         if st.session_state["editing_budget_item"]:
             match = filtered_data[filtered_data["rowid"] == st.session_state["editing_budget_item"]]
             if not match.empty:
-                # For editing, you may implement a similar HTML block with input fields if desired.
-                # For brevity, we simply rerun the edit action using query params.
-                st.info("Editing functionality is triggered. Please complete the edit form.")
+                st.info("Editing functionality triggered – please complete the edit form.")
         else:
             inc_data = filtered_data[filtered_data["type"]=="income"]
             exp_data = filtered_data[filtered_data["type"]=="expense"]
