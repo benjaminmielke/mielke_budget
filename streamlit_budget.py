@@ -922,7 +922,7 @@ if page_choice == "Budget Planning":
             save_fact_data(tx_df)
             rerun_fallback()
 
-    st.markdown("<div class='section-subheader'>Transactions This Month</div>", unsafe_allow_html=True)
+ st.markdown("<div class='section-subheader'>Transactions This Month</div>", unsafe_allow_html=True)
 
 if filtered_data.empty:
     st.write("No transactions found for this month.")
@@ -959,7 +959,6 @@ else:
             
             for _, row in group_df.iterrows():
                 render_budget_row(row, "#ff4444")
-
 # ─────────────────────────────────────────────────────────────────────────────
 # PAGE 2: Debt Domination
 # ─────────────────────────────────────────────────────────────────────────────
