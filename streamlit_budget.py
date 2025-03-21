@@ -6,6 +6,7 @@ from datetime import datetime, date
 import os
 import calendar
 import uuid
+import time
 from dateutil.relativedelta import relativedelta
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -628,7 +629,16 @@ def render_budget_row(row, color_class):
                     st.session_state["temp_budget_edit_amount"]
                 )
                 st.session_state["editing_budget_item"] = None
-                rerun_fallback()
+                st.markdown("""
+                <script>
+                setTimeout(function() {
+                    window.location.reload();
+                }, 500);
+                </script>
+                """, unsafe_allow_html=True)
+                st.success("Updated successfully!")
+                time.sleep(0.5)
+                
             if sc2.button("Cancel", key=f"cancel_{row_id}"):
                 st.session_state["editing_budget_item"] = None
                 rerun_fallback()
@@ -636,7 +646,15 @@ def render_budget_row(row, color_class):
         with btns_col:
             if st.button("❌", key=f"remove_{row_id}"):
                 remove_fact_row(row_id)
-                rerun_fallback()
+                st.markdown("""
+                <script>
+                setTimeout(function() {
+                    window.location.reload();
+                }, 500);
+                </script>
+                """, unsafe_allow_html=True)
+                st.success("Deleted successfully!")
+                time.sleep(0.5)
 
     else:
         with main_bar_col:
@@ -664,7 +682,15 @@ def render_budget_row(row, color_class):
                 rerun_fallback()
             if x_col.button("❌", key=f"removebtn_{row_id}"):
                 remove_fact_row(row_id)
-                rerun_fallback()
+                st.markdown("""
+                <script>
+                setTimeout(function() {
+                    window.location.reload();
+                }, 500);
+                </script>
+                """, unsafe_allow_html=True)
+                st.success("Deleted successfully!")
+                time.sleep(0.5)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # PAGE 1: Budget Planning
