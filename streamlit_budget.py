@@ -924,23 +924,41 @@ if page_choice == "Budget Planning":
 
     st.markdown("<div class='section-subheader'>Transactions This Month</div>", unsafe_allow_html=True)
 
-    if filtered_data.empty:
-        st.write("No transactions found for this month.")
-    else:
-        inc_data = filtered_data[filtered_data["type"]=="income"]
-        exp_data = filtered_data[filtered_data["type"]=="expense"]
+if filtered_data.empty:
+    st.write("No transactions found for this month.")
+else:
+    inc_data = filtered_data[filtered_data["type"]=="income"]
+    exp_data = filtered_data[filtered_data["type"]=="expense"]
 
-        if not inc_data.empty:
-            for cat_name, group_df in inc_data.groupby("category"):
-                st.markdown(f"<div class='category-header'>{cat_name}</div>", unsafe_allow_html=True)
-                for _, row in group_df.iterrows():
-                    render_budget_row(row, "#00cc00")
+    if not inc_data.empty:
+        for cat_name, group_df in inc_data.groupby("category"):
+            # Calculate category total
+            cat_total = group_df["amount"].sum()
+            # Render category header with total
+            st.markdown(f"""
+            <div class="category-header">
+                <span class="category-name">{cat_name}</span>
+                <span class="category-total" style="color: white;">Total: ${cat_total:,.2f}</span>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            for _, row in group_df.iterrows():
+                render_budget_row(row, "#00cc00")
 
-        if not exp_data.empty:
-            for cat_name, group_df in exp_data.groupby("category"):
-                st.markdown(f"<div class='category-header'>{cat_name}</div>", unsafe_allow_html=True)
-                for _, row in group_df.iterrows():
-                    render_budget_row(row, "#ff4444")
+    if not exp_data.empty:
+        for cat_name, group_df in exp_data.groupby("category"):
+            # Calculate category total
+            cat_total = group_df["amount"].sum()
+            # Render category header with total
+            st.markdown(f"""
+            <div class="category-header">
+                <span class="category-name">{cat_name}</span>
+                <span class="category-total" style="color: white;">Total: ${cat_total:,.2f}</span>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            for _, row in group_df.iterrows():
+                render_budget_row(row, "#ff4444")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # PAGE 2: Debt Domination
