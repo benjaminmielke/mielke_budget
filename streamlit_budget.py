@@ -237,16 +237,52 @@ def add_dimension_row(type_val, category_val, budget_item_val):
 # 5) Fact Table Functions (Budget Planning)
 # ─────────────────────────────────────────────────────────────────────────────
 def load_fact_data():
-    query = f"SELECT * FROM `{PROJECT_ID}.{DATASET_ID}.{FACT_TABLE_NAME}`"
-    df = client.query(query).to_dataframe()
-    df['date'] = pd.to_datetime(df['date'])
-    return df
+    """
+    Load transaction data with improved error handling
+    """
+    try:
+        query = f"SELECT * FROM `{PROJECT_ID}.{DATASET_ID}.{FACT_TABLE_NAME}`"
+        df = client.query(query).to_dataframe()
+        
+        # Ensure date column is properly formatted
+        if 'date' in df.columns:
+            df['date'] = pd.to_datetime(df['date'], errors='coerce')
+            
+        # Handle any missing values
+        if 'amount' in df.columns:
+            df['amount'] = df['amount'].fillna(0.0)
+            
+        return df
+    except Exception as e:
+        st.error(f"Error loading transaction data: {str(e)}")
+        # Return empty dataframe with expected columns
+        return pd.DataFrame(columns=['rowid', 'date', 'type', 'amount', 'category', 'budget_item', 'credit_card', 'note'])
 
 def save_fact_data(rows_df):
-    table_id = f"{PROJECT_ID}.{DATASET_ID}.{FACT_TABLE_NAME}"
-    job = client.load_table_from_dataframe(rows_df, table_id,
-        job_config=bigquery.LoadJobConfig(write_disposition="WRITE_APPEND"))
-    job.result()
+    """
+    Saves transaction data to the fact table with improved error handling
+    """
+    try:
+        table_id = f"{PROJECT_ID}.{DATASET_ID}.{FACT_TABLE_NAME}"
+        # Ensure date is in the correct format
+        if 'date' in rows_df.columns and not pd.api.types.is_datetime64_any_dtype(rows_df['date']):
+            rows_df['date'] = pd.to_datetime(rows_df['date'])
+            
+        # Ensure numeric columns are correct type
+        if 'amount' in rows_df.columns:
+            rows_df['amount'] = pd.to_numeric(rows_df['amount'], errors='coerce')
+            
+        job_config = bigquery.LoadJobConfig(
+            write_disposition="WRITE_APPEND",
+            schema_update_options=[bigquery.SchemaUpdateOption.ALLOW_FIELD_ADDITION]
+        )
+        
+        job = client.load_table_from_dataframe(rows_df, table_id, job_config=job_config)
+        job.result()  # Wait for the job to complete
+        return True
+    except Exception as e:
+        st.error(f"Error saving data: {str(e)}")
+        return False
 
 def remove_fact_row(row_id):
     query = f"""
@@ -806,19 +842,38 @@ if page_choice == "Budget Planning":
     cX, cY = st.columns([1,3])
     with cY:
         if st.button("Add Transaction"):
-            row_id = str(uuid.uuid4())
-            tx_df = pd.DataFrame([{
-                "rowid": row_id,
-                "date": date_input,
-                "type": type_input,
-                "amount": amount_input,
-                "category": category_input,
-                "budget_item": budget_item_input,
-                "credit_card": None,
-                "note": note_input
-            }])
-            save_fact_data(tx_df)
-            rerun_fallback()
+            with st.spinner("Saving transaction..."):
+                # Validate inputs
+                if not budget_item_input or budget_item_input == "(No items yet)":
+                    st.error("Please select a valid budget item")
+                elif amount_input <= 0:
+                    st.error("Amount must be greater than zero")
+                else:
+                    row_id = str(uuid.uuid4())
+                    tx_df = pd.DataFrame([{
+                        "rowid": row_id,
+                        "date": date_input,
+                        "type": type_input,
+                        "amount": amount_input,
+                        "category": category_input,
+                        "budget_item": budget_item_input,
+                        "credit_card": None,
+                        "note": note_input
+                    }])
+                    
+                    success = save_fact_data(tx_df)
+                    if success:
+                        st.success("Transaction added successfully!")
+                        # Use JavaScript to reload the page after a short delay
+                        st.markdown("""
+                        <script>
+                        setTimeout(function() {
+                            window.location.reload();
+                        }, 1000);
+                        </script>
+                        """, unsafe_allow_html=True)
+                    else:
+                        st.error("Failed to add transaction. Please try again.")
 
     st.markdown("<div class='section-subheader'>Transactions This Month</div>", unsafe_allow_html=True)
 
