@@ -75,7 +75,7 @@ if "temp_payoff_date" not in st.session_state:
     st.session_state["temp_payoff_date"] = datetime.today().date()
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 2) Custom CSS for Mobile–Optimized Layout
+# 2) Custom CSS for Computer Screen–Friendly Layout
 # ─────────────────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
@@ -116,15 +116,16 @@ st.markdown("""
     font-size: 12px;
     color: #fff;
 }
+/* Updated calendar container styling for computer screen friendly formatting */
 .calendar-container {
     overflow-x: auto;
-    max-width: 360px;
+    max-width: 800px;
     margin: auto;
 }
 .calendar-container table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 10px;
+    font-size: 14px;
 }
 </style>
 """, unsafe_allow_html=True)
