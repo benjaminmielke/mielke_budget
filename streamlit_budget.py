@@ -64,10 +64,32 @@ if "temp_payoff_date" not in st.session_state:
     st.session_state["temp_payoff_date"] = datetime.today().date()
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 2) Custom CSS for Layout and Stylized Calendar
+# 2) Custom CSS for Layout, Metrics, and Calendar Styling
 # ─────────────────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
+/* Container for top metrics */
+.metrics-container {
+    background: #222;
+    border-radius: 8px;
+    padding: 10px;
+    margin: 10px auto;
+    max-width: 800px;
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+}
+
+/* Each individual metric box */
+.metric-box {
+    background-color: #333;
+    padding: 8px 10px;
+    border-radius: 8px;
+    text-align: center;
+    font-size: 14px;
+    color: #fff;
+}
+
 /* Container for each transaction row */
 .line-item-container {
     background-color: #333;
@@ -413,7 +435,6 @@ def render_debt_transaction_row(row):
     balance_str = f"${row['current_balance']:,.2f}"
     due = row["due_date"] if row["due_date"] else "(None)"
     min_pay = row["minimum_payment"] if pd.notnull(row["minimum_payment"]) else "(None)"
-    payoff_text = "Recalc" if row.get("payoff_plan_date") else "Payoff"
     with st.container():
         cols = st.columns([1, 2, 1, 1, 1])
         with cols[0]:
@@ -458,6 +479,8 @@ if page_choice == "Budget Planning":
     current_month = st.session_state["current_month"]
     current_year = st.session_state["current_year"]
     st.markdown(f"<div style='text-align: center; font-size: 24px; font-weight: bold; padding: 10px;'>{calendar.month_name[current_month]} {current_year}</div>", unsafe_allow_html=True)
+    
+    # Navigation for previous and next month
     col_prev, col_next = st.columns(2)
     with col_prev:
         if st.button("Previous Month"):
@@ -475,6 +498,7 @@ if page_choice == "Budget Planning":
             else:
                 st.session_state["current_month"] += 1
             st.experimental_rerun()
+    
     fact_data = load_fact_data()
     fact_data.sort_values("date", ascending=True, inplace=True)
     filtered_data = fact_data[
@@ -484,8 +508,10 @@ if page_choice == "Budget Planning":
     total_income = filtered_data[filtered_data["type"]=="income"]["amount"].sum()
     total_expenses = filtered_data[filtered_data["type"]=="expense"]["amount"].sum()
     leftover = total_income - total_expenses
+    
+    # Top Metrics with background styling
     st.markdown(f"""
-    <div style='display: flex; justify-content: center; gap: 8px; padding: 10px 0;'>
+    <div class="metrics-container">
         <div class="metric-box">
             <div>Total Income</div>
             <div style='color:green;'>{total_income:,.2f}</div>
@@ -500,6 +526,7 @@ if page_choice == "Budget Planning":
         </div>
     </div>
     """, unsafe_allow_html=True)
+    
     # Stylized Calendar
     days_in_month = calendar.monthrange(current_year, current_month)[1]
     first_weekday = (calendar.monthrange(current_year, current_month)[0] + 1) % 7
